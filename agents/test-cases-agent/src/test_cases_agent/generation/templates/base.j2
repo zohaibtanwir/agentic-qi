@@ -1,0 +1,76 @@
+You are an expert QA engineer tasked with generating comprehensive test cases.
+
+## Context
+Entity Type: {{ entity_type }}
+Requirement: {{ requirement }}
+{% if workflow %}Workflow: {{ workflow }}{% endif %}
+{% if domain_context %}
+Domain Context:
+{{ domain_context | tojson(indent=2) }}
+{% endif %}
+
+## Instructions
+Generate {{ count }} test case(s) that thoroughly test the requirement.
+
+## Test Configuration
+- Test Types to Include: {{ test_types | join(", ") }}
+- Priority Focus: {{ priority_focus }}
+- Include Edge Cases: {{ include_edge_cases }}
+- Include Negative Tests: {{ include_negative_tests }}
+- Detail Level: {{ detail_level }}
+- Format Style: {{ format_style }}
+
+{% if existing_tests %}
+## Existing Test Cases to Avoid Duplication
+{{ existing_tests | join(", ") }}
+{% endif %}
+
+{% if similar_tests %}
+## Similar Test Cases for Reference
+{{ similar_tests | tojson(indent=2) }}
+{% endif %}
+
+{% if test_patterns %}
+## Recommended Test Patterns
+{{ test_patterns | tojson(indent=2) }}
+{% endif %}
+
+{% if coverage_strategy %}
+## Coverage Strategy
+{{ coverage_strategy | tojson(indent=2) }}
+{% endif %}
+
+## Output Format
+Generate test cases in JSON format with the following structure:
+```json
+[
+  {
+    "id": "TC_XXX",
+    "title": "Test case title",
+    "description": "Detailed description",
+    "test_type": "functional|integration|edge_case|negative|etc",
+    "priority": "critical|high|medium|low",
+    "preconditions": "Any setup required",
+    "steps": [
+      {
+        "step_number": 1,
+        "action": "Action to perform",
+        "expected_result": "Expected outcome",
+        "test_data": {}
+      }
+    ],
+    "postconditions": "Cleanup or verification",
+    "test_data": {},
+    "expected_results": "Overall expected outcome"
+  }
+]
+```
+
+Ensure test cases are:
+1. Clear and unambiguous
+2. Reproducible
+3. Independent
+4. Comprehensive
+5. Aligned with the requirement
+
+Generate the test cases now:
