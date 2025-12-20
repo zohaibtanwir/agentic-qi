@@ -63,11 +63,13 @@ class TestCasesAgent:
         ]
         reflection.enable_server_reflection(service_names, self.server)
 
-        # TODO: Add TestCasesService implementation in Phase 1
-        # from test_cases_agent.server.service import TestCasesService
-        # test_cases_pb2_grpc.add_TestCasesServiceServicer_to_server(
-        #     TestCasesService(), self.server
-        # )
+        # Add TestCasesService implementation
+        from test_cases_agent.server.service import TestCasesService
+        from test_cases_agent.proto import test_cases_pb2_grpc
+
+        test_cases_pb2_grpc.add_TestCasesServiceServicer_to_server(
+            TestCasesService(), self.server
+        )
 
         # Bind to port
         address = f"[::]:{self.settings.grpc_port}"
