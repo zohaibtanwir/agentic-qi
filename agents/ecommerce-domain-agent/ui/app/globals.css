@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%; /* White background */
+    --foreground: 0 0% 16%; /* Dark gray text */
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 16%;
+
+    --primary: 0 100% 36%; /* Macy's red */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 16%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 16%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 100% 36%;
+
+    --radius: 0.25rem;
+  }
+
+  .dark {
+    --background: 0 0% 16%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 16%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 16%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 100% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 23%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 23%;
+    --muted-foreground: 0 0% 64%;
+
+    --accent: 0 0% 23%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 23%;
+    --input: 0 0% 23%;
+    --ring: 0 100% 36%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom Macy's styles */
+.macys-header {
+  @apply bg-white border-b border-gray-200;
+}
+
+.macys-red-button {
+  @apply bg-macys-red hover:bg-macys-darkRed text-white font-medium py-2 px-4 rounded transition-colors;
+}
+
+.macys-link {
+  @apply text-macys-red hover:text-macys-darkRed underline transition-colors;
+}

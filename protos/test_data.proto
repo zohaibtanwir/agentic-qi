@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package testdata.v1;
+
+// Service exposed by Test Data Agent
+service TestDataService {
+  // Generate test data based on entity and context
+  rpc GenerateData(GenerateRequest) returns (GenerateResponse);
+  
+  // Get available schemas
+  rpc GetSchemas(GetSchemasRequest) returns (GetSchemasResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// ============ Generate Data ============
+
+message GenerateRequest {
+  string request_id = 1;
+  string domain = 2;                    // ecommerce, supply_chain, etc.
+  string entity = 3;                    // customer, order, product, etc.
+  int32 count = 4;                      // Number of records to generate
+  string context = 5;                   // Natural language context for generation
+  repeated string scenarios = 6;        // Specific scenarios to generate
+  string output_format = 7;             // json, csv, sql
+  map<string, int32> scenario_counts = 8;  // Count per scenario
+  bool include_edge_cases = 9;          // Include edge case data
+  string custom_context = 10;           // Additional custom context
+  string workflow_context = 11;         // Workflow being tested
+  string llm_provider = 12;             // anthropic, openai, gemini
+  float temperature = 13;               // LLM temperature
+  int32 max_tokens = 14;                // LLM max tokens
+  string inline_schema = 15;            // Inline schema definition (JSON)
+}
+
+message GenerateResponse {
+  string request_id = 1;
+  bool success = 2;
+  string data = 3;                      // Generated data as JSON/CSV/SQL string
+  int32 record_count = 4;
+  GenerationMetadata metadata = 5;
+  string error = 6;
+}
+
+message GenerationMetadata {
+  string generation_path = 1;           // schema, rag, llm
+  int32 llm_tokens_used = 2;
+  float generation_time_ms = 3;
+  float coherence_score = 4;            // 0.0 - 1.0, how coherent the data is
+  string domain_context_used = 5;
+  map<string, int32> scenario_counts = 6;
+}
+
+// ============ Get Schemas ============
+
+message GetSchemasRequest {
+  string domain = 1;                    // Filter by domain (optional)
+}
+
+message GetSchemasResponse {
+  repeated Schema schemas = 1;
+}
+
+message Schema {
+  string name = 1;
+  string domain = 2;
+  string description = 3;
+  repeated SchemaField fields = 4;
+}
+
+message SchemaField {
+  string name = 1;
+  string type = 2;
+  string description = 3;
+  bool required = 4;
+  string example = 5;
+}
+
+// ============ Health ============
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;                    // healthy, degraded, unhealthy
+  map<string, string> components = 2;
+}

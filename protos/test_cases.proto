@@ -1,0 +1,277 @@
+syntax = "proto3";
+
+package testcases.v1;
+
+service TestCasesService {
+  // Generate test cases from requirements
+  rpc GenerateTestCases(GenerateTestCasesRequest) returns (GenerateTestCasesResponse);
+  
+  // Get a specific test case by ID
+  rpc GetTestCase(GetTestCaseRequest) returns (GetTestCaseResponse);
+  
+  // List historical test cases
+  rpc ListTestCases(ListTestCasesRequest) returns (ListTestCasesResponse);
+  
+  // Store test cases (for learning)
+  rpc StoreTestCases(StoreTestCasesRequest) returns (StoreTestCasesResponse);
+  
+  // Get coverage analysis for requirements
+  rpc AnalyzeCoverage(AnalyzeCoverageRequest) returns (AnalyzeCoverageResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// ============ Generate Test Cases ============
+
+message GenerateTestCasesRequest {
+  string request_id = 1;
+  
+  // Input type (one of)
+  oneof input {
+    UserStoryInput user_story = 2;
+    ApiSpecInput api_spec = 3;
+    FreeFormInput free_form = 4;
+  }
+  
+  // Domain enrichment (optional)
+  DomainConfig domain_config = 5;
+  
+  // Generation configuration
+  GenerationConfig config = 6;
+  
+  // Test data configuration
+  TestDataConfig test_data_config = 7;
+}
+
+message UserStoryInput {
+  string story = 1;                         // "As a customer, I want to..."
+  repeated string acceptance_criteria = 2;  // List of ACs
+  string additional_context = 3;            // Optional extra context
+}
+
+message ApiSpecInput {
+  string spec = 1;                          // OpenAPI/GraphQL spec (JSON/YAML string)
+  string spec_format = 2;                   // openapi, graphql
+  repeated string endpoints = 3;            // Specific endpoints to test (optional)
+}
+
+message FreeFormInput {
+  string requirements = 1;                  // Free-form requirements text
+}
+
+message DomainConfig {
+  string domain = 1;                        // ecommerce, supply_chain, etc.
+  string entity = 2;                        // cart, order, payment, etc.
+  string workflow = 3;                      // checkout, return_flow, etc.
+  bool include_business_rules = 4;          // Fetch rules from Domain Agent
+  bool include_edge_cases = 5;              // Fetch edge cases from Domain Agent
+}
+
+message GenerationConfig {
+  OutputFormat output_format = 1;           // GHERKIN, TRADITIONAL, JSON
+  CoverageLevel coverage_level = 2;         // QUICK, STANDARD, EXHAUSTIVE
+  repeated TestType test_types = 3;         // FUNCTIONAL, NEGATIVE, BOUNDARY, etc.
+  string llm_provider = 4;                  // anthropic, openai, gemini (default: anthropic)
+  bool check_duplicates = 5;                // Check against existing test cases
+  int32 max_test_cases = 6;                 // Limit number of generated cases
+  string priority_focus = 7;                // high, medium, low (focus on this priority)
+}
+
+message TestDataConfig {
+  bool generate_test_data = 1;              // Request sample data from Test Data Agent
+  TestDataPlacement placement = 2;          // EMBEDDED, SEPARATE, BOTH
+  int32 samples_per_case = 3;               // Number of data samples per test case
+}
+
+enum OutputFormat {
+  OUTPUT_FORMAT_UNSPECIFIED = 0;
+  GHERKIN = 1;
+  TRADITIONAL = 2;
+  JSON = 3;
+}
+
+enum CoverageLevel {
+  COVERAGE_LEVEL_UNSPECIFIED = 0;
+  QUICK = 1;                                // Happy path + critical negatives
+  STANDARD = 2;                             // Comprehensive functional + negative
+  EXHAUSTIVE = 3;                           // All scenarios including edge cases
+}
+
+enum TestType {
+  TEST_TYPE_UNSPECIFIED = 0;
+  FUNCTIONAL = 1;                           // Happy path, expected behavior
+  NEGATIVE = 2;                             // Invalid inputs, error handling
+  BOUNDARY = 3;                             // Min/max values, limits
+  EDGE_CASE = 4;                            // Unusual scenarios
+  SECURITY = 5;                             // Security-related tests
+  PERFORMANCE = 6;                          // Performance hints/scenarios
+}
+
+enum TestDataPlacement {
+  TEST_DATA_PLACEMENT_UNSPECIFIED = 0;
+  EMBEDDED = 1;                             // Data within test steps
+  SEPARATE = 2;                             // Data in separate section
+  BOTH = 3;                                 // Both embedded and separate
+}
+
+message GenerateTestCasesResponse {
+  string request_id = 1;
+  bool success = 2;
+  repeated TestCase test_cases = 3;
+  GenerationMetadata metadata = 4;
+  string error = 5;
+}
+
+message TestCase {
+  string id = 1;                            // TC-001, TC-002, etc.
+  string title = 2;
+  string description = 3;
+  TestType type = 4;
+  string priority = 5;                      // high, medium, low
+  repeated string tags = 6;
+  string requirement_id = 7;                // Traceability
+  
+  // Preconditions
+  repeated string preconditions = 8;
+  
+  // Test steps (for TRADITIONAL format)
+  repeated TestStep steps = 9;
+  
+  // Gherkin content (for GHERKIN format)
+  string gherkin = 10;
+  
+  // Test data
+  TestData test_data = 11;
+  
+  // Expected results summary
+  string expected_result = 12;
+  
+  // Postconditions
+  repeated string postconditions = 13;
+}
+
+message TestStep {
+  int32 order = 1;
+  string action = 2;
+  string expected_result = 3;
+  string test_data = 4;                     // Embedded test data (if EMBEDDED or BOTH)
+}
+
+message TestData {
+  repeated TestDataItem items = 1;
+}
+
+message TestDataItem {
+  string field = 1;
+  string value = 2;
+  string description = 3;
+}
+
+message GenerationMetadata {
+  string llm_provider = 1;
+  string llm_model = 2;
+  int32 llm_tokens_used = 3;
+  float generation_time_ms = 4;
+  int32 test_cases_generated = 5;
+  int32 duplicates_found = 6;
+  CoverageAnalysis coverage = 7;
+  string domain_context_used = 8;
+}
+
+message CoverageAnalysis {
+  int32 functional_count = 1;
+  int32 negative_count = 2;
+  int32 boundary_count = 3;
+  int32 edge_case_count = 4;
+  repeated string uncovered_areas = 5;      // Areas that might need more coverage
+}
+
+// ============ Get Test Case ============
+
+message GetTestCaseRequest {
+  string test_case_id = 1;
+}
+
+message GetTestCaseResponse {
+  TestCase test_case = 1;
+}
+
+// ============ List Test Cases ============
+
+message ListTestCasesRequest {
+  string domain = 1;                        // Filter by domain
+  string entity = 2;                        // Filter by entity
+  TestType type = 3;                        // Filter by test type
+  string search_query = 4;                  // Semantic search
+  int32 limit = 5;
+  int32 offset = 6;
+}
+
+message ListTestCasesResponse {
+  repeated TestCaseSummary test_cases = 1;
+  int32 total_count = 2;
+}
+
+message TestCaseSummary {
+  string id = 1;
+  string title = 2;
+  TestType type = 3;
+  string priority = 4;
+  string domain = 5;
+  string entity = 6;
+  string created_at = 7;
+}
+
+// ============ Store Test Cases ============
+
+message StoreTestCasesRequest {
+  repeated TestCase test_cases = 1;
+  string domain = 2;
+  string entity = 3;
+  string source = 4;                        // manual, generated, imported
+}
+
+message StoreTestCasesResponse {
+  bool success = 1;
+  int32 stored_count = 2;
+  string error = 3;
+}
+
+// ============ Coverage Analysis ============
+
+message AnalyzeCoverageRequest {
+  string request_id = 1;
+  oneof input {
+    UserStoryInput user_story = 2;
+    ApiSpecInput api_spec = 3;
+  }
+  repeated string existing_test_case_ids = 4;  // IDs of existing cases to check against
+}
+
+message AnalyzeCoverageResponse {
+  string request_id = 1;
+  CoverageReport report = 2;
+}
+
+message CoverageReport {
+  float overall_coverage = 1;               // 0.0 - 1.0
+  repeated CoverageGap gaps = 2;
+  repeated string recommendations = 3;
+}
+
+message CoverageGap {
+  string area = 1;                          // What's not covered
+  string type = 2;                          // functional, negative, boundary
+  string severity = 3;                      // high, medium, low
+  string suggestion = 4;                    // Suggested test case
+}
+
+// ============ Health ============
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;                        // healthy, degraded, unhealthy
+  map<string, string> components = 2;
+}

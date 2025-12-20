@@ -1,0 +1,252 @@
+syntax = "proto3";
+
+package ecommerce.domain.v1;
+
+// Service exposed by eCommerce Domain Agent
+service EcommerceDomainService {
+  // Get domain context for test generation
+  rpc GetDomainContext(DomainContextRequest) returns (DomainContextResponse);
+
+  // Query domain knowledge
+  rpc QueryKnowledge(KnowledgeRequest) returns (KnowledgeResponse);
+
+  // Get entity details
+  rpc GetEntity(EntityRequest) returns (EntityResponse);
+
+  // Get workflow details
+  rpc GetWorkflow(WorkflowRequest) returns (WorkflowResponse);
+
+  // List all entities
+  rpc ListEntities(ListEntitiesRequest) returns (ListEntitiesResponse);
+
+  // List all workflows
+  rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse);
+
+  // Get edge cases for an entity/workflow
+  rpc GetEdgeCases(EdgeCasesRequest) returns (EdgeCasesResponse);
+
+  // Generate test data (proxies to Test Data Agent with domain context)
+  rpc GenerateTestData(GenerateTestDataRequest) returns (GenerateTestDataResponse);
+
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// ============ Domain Context ============
+
+message DomainContextRequest {
+  string request_id = 1;
+  string entity = 2;
+  string workflow = 3;
+  string scenario = 4;
+  repeated string aspects = 5;
+}
+
+message DomainContextResponse {
+  string request_id = 1;
+  string context = 2;
+  repeated BusinessRule rules = 3;
+  repeated EntityRelationship relationships = 4;
+  repeated string edge_cases = 5;
+  map<string, string> metadata = 6;
+}
+
+message BusinessRule {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string entity = 4;
+  string condition = 5;
+  string constraint = 6;
+  string severity = 7;
+}
+
+message EntityRelationship {
+  string source_entity = 1;
+  string target_entity = 2;
+  string relationship_type = 3;
+  string description = 4;
+  bool required = 5;
+}
+
+// ============ Knowledge Query ============
+
+message KnowledgeRequest {
+  string request_id = 1;
+  string query = 2;
+  repeated string categories = 3;
+  int32 max_results = 4;
+}
+
+message KnowledgeResponse {
+  string request_id = 1;
+  repeated KnowledgeItem items = 2;
+  string summary = 3;
+}
+
+message KnowledgeItem {
+  string id = 1;
+  string category = 2;
+  string title = 3;
+  string content = 4;
+  float relevance_score = 5;
+  map<string, string> metadata = 6;
+}
+
+// ============ Entities ============
+
+message EntityRequest {
+  string entity_name = 1;
+  bool include_relationships = 2;
+  bool include_rules = 3;
+  bool include_edge_cases = 4;
+}
+
+message EntityResponse {
+  Entity entity = 1;
+}
+
+message Entity {
+  string name = 1;
+  string description = 2;
+  repeated EntityField fields = 3;
+  repeated BusinessRule rules = 4;
+  repeated EntityRelationship relationships = 5;
+  repeated string edge_cases = 6;
+  repeated string test_scenarios = 7;
+}
+
+message EntityField {
+  string name = 1;
+  string type = 2;
+  string description = 3;
+  bool required = 4;
+  repeated string validations = 5;
+  string example = 6;
+}
+
+message ListEntitiesRequest {
+  string category = 1;
+}
+
+message ListEntitiesResponse {
+  repeated EntitySummary entities = 1;
+}
+
+message EntitySummary {
+  string name = 1;
+  string description = 2;
+  string category = 3;
+  int32 field_count = 4;
+}
+
+// ============ Workflows ============
+
+message WorkflowRequest {
+  string workflow_name = 1;
+  bool include_steps = 2;
+  bool include_edge_cases = 3;
+}
+
+message WorkflowResponse {
+  Workflow workflow = 1;
+}
+
+message Workflow {
+  string name = 1;
+  string description = 2;
+  repeated WorkflowStep steps = 3;
+  repeated string involved_entities = 4;
+  repeated BusinessRule rules = 5;
+  repeated string edge_cases = 6;
+  repeated string test_scenarios = 7;
+}
+
+message WorkflowStep {
+  int32 order = 1;
+  string name = 2;
+  string description = 3;
+  string entity = 4;
+  string action = 5;
+  repeated string validations = 6;
+  repeated string possible_outcomes = 7;
+}
+
+message ListWorkflowsRequest {}
+
+message ListWorkflowsResponse {
+  repeated WorkflowSummary workflows = 1;
+}
+
+message WorkflowSummary {
+  string name = 1;
+  string description = 2;
+  int32 step_count = 3;
+  repeated string involved_entities = 4;
+}
+
+// ============ Edge Cases ============
+
+message EdgeCasesRequest {
+  string entity = 1;
+  string workflow = 2;
+  string category = 3;
+}
+
+message EdgeCasesResponse {
+  repeated EdgeCase edge_cases = 1;
+}
+
+message EdgeCase {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string category = 4;
+  string entity = 5;
+  string workflow = 6;
+  string test_approach = 7;
+  map<string, string> example_data = 8;
+  string expected_behavior = 9;
+  string severity = 10;
+}
+
+// ============ Test Data Generation ============
+
+message GenerateTestDataRequest {
+  string request_id = 1;
+  string entity = 2;
+  int32 count = 3;
+  string workflow_context = 4;
+  repeated string scenarios = 5;
+  string custom_context = 6;
+  bool include_edge_cases = 7;
+  string output_format = 8;
+  map<string, int32> scenario_counts = 9;
+}
+
+message GenerateTestDataResponse {
+  string request_id = 1;
+  bool success = 2;
+  string data = 3;
+  int32 record_count = 4;
+  GenerationMetadata metadata = 5;
+  string error = 6;
+}
+
+message GenerationMetadata {
+  string generation_path = 1;
+  int32 llm_tokens_used = 2;
+  float generation_time_ms = 3;
+  float coherence_score = 4;
+  string domain_context_used = 5;
+  map<string, int32> scenario_counts = 6;
+}
+
+// ============ Health ============
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;
+  map<string, string> components = 2;
+}
