@@ -1,28 +1,43 @@
-# Product Requirements Document: QA Platform Frontend UI
+# Product Requirements Document: QA Platform Frontend UI with gRPC-Web
 
-**Version**: 1.0
+**Version**: 2.0 (gRPC-Web)
 **Date**: December 21, 2025
 **Status**: Draft
-**Phase**: Phase 1 - MVP
+**Backend Communication**: gRPC-Web via Envoy Proxy
 
 ---
 
 ## 1. Executive Summary
 
 ### 1.1 Product Overview
-The QA Platform Frontend UI is a web-based interface that enables QA engineers, developers, and product managers to generate, view, and manage AI-powered test cases. Phase 1 focuses on the Test Cases Agent interface with mock data, providing a foundation for future agent integrations.
+The QA Platform Frontend UI is a web-based interface that enables QA engineers, developers, and product managers to generate, view, and manage AI-powered test cases. The frontend communicates directly with backend gRPC services through gRPC-Web protocol via an Envoy proxy.
 
-### 1.2 Goals
-- **Primary**: Enable users to generate comprehensive test cases from requirements using AI
-- **Secondary**: Provide intuitive UI for viewing and managing generated test cases
-- **Tertiary**: Establish design system and architecture for future agent integrations
+### 1.2 Architecture Decision
+**Selected Approach**: **gRPC-Web (Direct Protocol Communication)**
+
+```
+Browser
+  ↓ grpc-web library (binary protocol)
+Envoy Proxy (port 8080)
+  ↓ gRPC protocol translation
+Test Cases Agent (port 9003)
+  ↓ gRPC calls
+Anthropic Claude API
+```
+
+**Key Benefits**:
+- End-to-end type safety with proto-generated TypeScript
+- Binary protocol (smaller payloads than JSON)
+- Streaming support ready for future enhancements
+- Direct mapping from proto definitions to UI
+- No manual JSON/proto conversion needed
 
 ### 1.3 Success Metrics
-- Users can successfully generate test cases from all 3 input types (User Story, API Spec, Free Form)
-- Test case generation form completion rate > 80%
-- User can view full test case details within 2 clicks
-- Page load time < 2 seconds
-- Mobile responsive (works on tablet and desktop)
+- Successfully generate test cases from all 3 input types
+- Proto compilation pipeline integrated into build
+- Envoy proxy configured and operational
+- Form-to-proto conversion working correctly
+- Proto responses properly displayed in UI
 
 ---
 
@@ -30,1114 +45,886 @@ The QA Platform Frontend UI is a web-based interface that enables QA engineers, 
 
 ### 2.1 Primary Personas
 
-**QA Engineer (Primary)**
-- Needs to create test cases from user stories and requirements
-- Values comprehensive coverage and different test types
-- Familiar with Gherkin and traditional test case formats
-- Works with JIRA, TestRail, or similar tools
+**QA Engineer** (Primary)
+- Generates test cases from user stories
+- Values comprehensive test coverage
+- Familiar with Gherkin and traditional formats
 
-**Developer (Secondary)**
-- Needs quick test cases for API endpoints
-- Prefers structured formats (OpenAPI specs)
-- Values functional and negative test scenarios
+**Developer** (Secondary)
+- Generates test cases from OpenAPI specs
+- Prefers structured, type-safe interfaces
 - Integrates with CI/CD pipelines
 
-**Product Manager (Tertiary)**
-- Reviews test coverage for features
-- Needs to validate requirements are testable
-- Less technical, prefers visual representation
+**Product Manager** (Tertiary)
+- Reviews test coverage
+- Validates requirements
 - Focuses on acceptance criteria
 
 ---
 
-## 3. Functional Requirements
+## 3. Technical Architecture
 
-## 3.1 Landing Page (`/`)
+### 3.1 gRPC-Web Communication Stack
 
-### 3.1.1 Overview
-Dashboard view showing all available agents with navigation cards.
-
-### 3.1.2 Components
-
-**Agent Cards** (3 cards in grid layout)
-1. **Test Data Agent**
-   - Name, icon, description
-   - Status: "Operational" (green indicator)
-   - Link to external Test Data Agent UI
-   - Quick stats: "5,678 records generated"
-
-2. **Test Cases Agent**
-   - Name, icon, description
-   - Status: "Operational" (green indicator)
-   - "Open" button → navigates to `/test-cases`
-   - Quick stats: "1,234 test cases generated"
-
-3. **eCommerce Domain Agent**
-   - Name, icon, description
-   - Status: "Coming Soon" (gray indicator)
-   - Disabled state (no click action)
-   - Quick stats: "89 domain rules"
-
-**Platform Stats Dashboard**
-- Total test cases generated: 1,234
-- Total test data records: 5,678
-- Domain rules available: 89
-- Last activity timestamp
-
-**Mock Data Structure**:
-```json
-{
-  "agents": [
-    {
-      "id": "test-data-agent",
-      "name": "Test Data Agent",
-      "description": "Generate realistic test data using AI",
-      "status": "operational",
-      "link": "/test-data",
-      "isExternal": true,
-      "stats": { "recordsGenerated": 5678 }
-    },
-    {
-      "id": "test-cases-agent",
-      "name": "Test Cases Agent",
-      "description": "Generate comprehensive test cases from requirements",
-      "status": "operational",
-      "link": "/test-cases",
-      "isExternal": false,
-      "stats": { "testCasesGenerated": 1234 }
-    },
-    {
-      "id": "ecommerce-domain-agent",
-      "name": "eCommerce Domain Agent",
-      "description": "Domain-specific context and business rules",
-      "status": "coming-soon",
-      "link": "#",
-      "isExternal": false,
-      "stats": { "domainRules": 89 }
-    }
-  ]
-}
-```
-
----
-
-## 3.2 Test Cases Agent Page (`/test-cases`)
-
-### 3.2.1 Page Layout
-
-**Header Section**
-- Agent name: "Test Cases Agent"
-- Status badge: "Operational" (green)
-- Quick action: "New Generation" button (scrolls to form)
-- Breadcrumb: Home > Test Cases Agent
-
-**Main Content** (Two-column layout)
-- Left: Generation Form (60% width)
-- Right: Configuration Panel (40% width)
-
-**Results Section** (Below form, appears after generation)
-- Generated test cases list
-- Metadata display
-- Export options (future)
-
----
-
-### 3.2.2 Generation Form
-
-#### 3.2.2.1 Input Type Selection
-**Tab Interface** (3 tabs, mutually exclusive)
-
-**Tab 1: User Story**
-```
-Fields:
-- Story Text (textarea, required)
-  Placeholder: "As a customer, I want to add items to cart so that I can purchase multiple products..."
-  Validation: Min 20 characters
-
-- Acceptance Criteria (multi-line input, dynamic add/remove)
-  Placeholder: "Given..., When..., Then..."
-  Validation: At least 1 criterion required
-
-- Additional Context (textarea, optional)
-  Placeholder: "Business rules, constraints, related features..."
-```
-
-**Tab 2: API Specification**
-```
-Fields:
-- Specification Format (dropdown, required)
-  Options: OpenAPI, GraphQL
-  Default: OpenAPI
-
-- Spec Content (code editor textarea, required)
-  Placeholder: "Paste your OpenAPI/GraphQL spec here (JSON or YAML)..."
-  Validation: Valid JSON/YAML format
-  Syntax highlighting: Yes
-
-- Endpoints to Test (multi-select chips, optional)
-  Placeholder: "Leave empty to test all endpoints"
-  Example: /api/cart/add, /api/cart/remove
-```
-
-**Tab 3: Free Form Requirements**
-```
-Fields:
-- Requirement Text (rich textarea, required)
-  Placeholder: "Describe the feature or functionality to test..."
-  Validation: Min 50 characters
-
-- Context Information (key-value pairs, optional)
-  Format: Key | Value (dynamic add/remove rows)
-  Example:
-    - Key: "Feature", Value: "Shopping Cart"
-    - Key: "Priority", Value: "High"
-```
-
-#### 3.2.2.2 Configuration Panel
-
-**Output Format Section**
-```
-Label: Test Case Format
-Type: Radio buttons (horizontal)
-Options:
-  - Traditional (default)
-    Description: "Step-by-step with actions and expected results"
-  - Gherkin
-    Description: "Given-When-Then BDD format"
-  - JSON
-    Description: "Structured data format"
-```
-
-**Coverage Level Section**
-```
-Label: Coverage Level
-Type: Segmented control / Pills
-Options:
-  - Quick (default)
-    Tooltip: "Happy path + critical negatives"
-  - Standard
-    Tooltip: "Comprehensive functional + negative tests"
-  - Exhaustive
-    Tooltip: "All scenarios including edge cases"
-```
-
-**Test Types Section**
-```
-Label: Test Types to Include
-Type: Multi-select checkboxes (scrollable, max-height)
-Default selected: Functional, Negative
-Options (with icons):
-  ✓ Functional (default checked)
-  ✓ Negative (default checked)
-  ☐ Boundary
-  ☐ Edge Case
-  ☐ Security
-  ☐ Performance
-  ☐ Integration
-  ☐ API
-  ... (show top 10, "Show more" link to expand)
-```
-
-**Advanced Options Section** (Collapsible, collapsed by default)
-```
-Label: Advanced Settings (click to expand)
-
-Fields:
-- Max Test Cases (number input)
-  Default: 10
-  Min: 1, Max: 50
-
-- Priority Focus (dropdown, optional)
-  Options: All (default), Critical, High, Medium, Low
-  Description: "Focus generation on specific priority level"
-
-- Detail Level (radio buttons)
-  Options: Low, Medium (default), High
-  Description: "Level of detail in test case steps"
-```
-
-**Action Buttons**
-```
-Primary: "Generate Test Cases" (Macy's red, full width)
-Secondary: "Reset Form" (ghost button, below primary)
-```
-
----
-
-### 3.2.3 Generation Results Display
-
-#### 3.2.3.1 Loading State
-```
-- Animated spinner with Macy's red accent
-- Message: "Generating test cases..."
-- Sub-message: "This may take 10-30 seconds"
-- Progress indicator (if possible from backend)
-```
-
-#### 3.2.3.2 Results Header
-```
-Title: "Generated Test Cases"
-Metadata badges:
-  - Test cases generated: 8
-  - Coverage level: Standard
-  - Format: Traditional
-  - Generation time: 12.5s
-```
-
-#### 3.2.3.3 Test Case Cards (List View)
-
-**Card Layout** (Stack of cards, scrollable)
-```
-Each card displays:
-
-┌─────────────────────────────────────────┐
-│ [Icon] TC-001                    [Badge]│
-│ ✓ Functional | ⚠ High Priority         │
-│                                         │
-│ User successfully adds item to cart    │
-│                                         │
-│ Preconditions: User logged in, ...     │
-│ Steps: 3 steps                          │
-│ Tags: cart, checkout, functional        │
-│                                         │
-│ [View Details] button                   │
-└─────────────────────────────────────────┘
-
-Card Properties:
-- ID: TC-001, TC-002, etc.
-- Type icon + label (colored)
-- Priority badge (colored: Critical=red, High=orange, Medium=blue, Low=gray)
-- Title (truncated to 2 lines)
-- Preview: First precondition + step count
-- Tags (max 3 visible, +N more)
-- "View Details" button (secondary style)
-```
-
-**List Features**
-- Filter by type (dropdown)
-- Filter by priority (dropdown)
-- Sort by: Priority (default), ID, Type
-- Pagination: 10 cards per page
-
-#### 3.2.3.4 Metadata Panel (Below cards)
-```
-Generation Metadata:
-- LLM Provider: Anthropic Claude
-- Model: claude-3.5-sonnet
-- Tokens used: 1,234
-- Coverage breakdown:
-  - Functional: 5 test cases
-  - Negative: 2 test cases
-  - Boundary: 1 test case
-```
-
----
-
-### 3.2.4 Test Case Detail View
-
-#### 3.2.4.1 Navigation
-```
-Trigger: Click "View Details" on any card
-Action: Navigate to /test-cases/[id] OR open modal/side panel
-Preferred: Side panel (keeps context)
-```
-
-#### 3.2.4.2 Detail Panel Layout
-
-**Header**
-```
-┌─────────────────────────────────────────┐
-│ ← Back to Results                       │
-│                                         │
-│ TC-001                          [Badge] │
-│ ✓ Functional Test | ⚠ High Priority    │
-│                                         │
-│ User successfully adds item to cart    │
-│                                         │
-│ Tags: cart, checkout, functional        │
-└─────────────────────────────────────────┘
-```
-
-**Content Sections** (Vertical scroll)
-
-**1. Description**
-```
-Label: Description
-Content: Full test case description text
-```
-
-**2. Preconditions**
-```
-Label: Preconditions
-Content: Bulleted list
-Example:
-  • User is logged in
-  • Product is in stock
-  • Shopping cart is empty
-```
-
-**3. Test Steps** (for Traditional format)
-```
-Label: Test Steps
-Format: Numbered list with table layout
-
-┌────┬──────────────────────┬──────────────────────┐
-│ #  │ Action               │ Expected Result      │
-├────┼──────────────────────┼──────────────────────┤
-│ 1  │ Navigate to product  │ Product page loads   │
-│    │ page                 │ with details         │
-├────┼──────────────────────┼──────────────────────┤
-│ 2  │ Click "Add to Cart"  │ Item added to cart,  │
-│    │ button               │ cart count updates   │
-└────┴──────────────────────┴──────────────────────┘
-
-Styling:
-- Alternating row colors
-- Hover state
-- Step number in gray circle
-```
-
-**4. Gherkin** (for Gherkin format)
-```
-Label: Gherkin Scenario
-Format: Code block with syntax highlighting
-
-Given user is logged in
-And product "iPhone 14" is in stock
-When user navigates to product page
-And user clicks "Add to Cart" button
-Then product is added to cart
-And cart count increases by 1
-And cart total updates correctly
-```
-
-**5. Test Data** (if available)
-```
-Label: Test Data
-Format: Key-value pairs or table
-
-┌──────────────┬──────────────────┐
-│ Field        │ Value            │
-├──────────────┼──────────────────┤
-│ User ID      │ user123          │
-│ Product ID   │ prod456          │
-│ Quantity     │ 1                │
-│ Price        │ $999.99          │
-└──────────────┴──────────────────┘
-```
-
-**6. Expected Results**
-```
-Label: Expected Results
-Content: Summary text
-Example: "User should see cart with 1 item, total price updated, success message displayed"
-```
-
-**7. Postconditions**
-```
-Label: Postconditions
-Content: Bulleted list
-Example:
-  • Cart contains 1 item
-  • Inventory decremented by 1
-  • Session state updated
-```
-
-**Action Buttons** (Sticky footer)
-```
-- Copy to Clipboard (copy entire test case as text)
-- Export (download as JSON/YAML/Markdown)
-- Edit (future - opens edit mode)
-- Close / Back to Results
-```
-
----
-
-## 3.3 Mock Data Strategy (Phase 1)
-
-### 3.3.1 Generation Form Behavior
+**Client Side** (Browser):
 ```
-When user clicks "Generate Test Cases":
-1. Show loading state (2-3 seconds delay to simulate API call)
-2. Return predefined mock test cases from JSON file
-3. Vary results slightly based on:
-   - Input type selected (different titles/descriptions)
-   - Coverage level (Quick: 3-5 cases, Standard: 5-10, Exhaustive: 10-15)
-   - Test types selected (filter mock data by types)
+React Component
+  ↓ Form Data
+Custom Hook (useGenerateTestCases)
+  ↓ Build Proto Message
+gRPC-Web Client (auto-generated from .proto)
+  ↓ Binary gRPC-Web Protocol
+HTTP/2 or HTTP/1.1
 ```
 
-### 3.3.2 Mock Test Cases Data Structure
-```json
-{
-  "requestId": "req-12345",
-  "success": true,
-  "testCases": [
-    {
-      "id": "TC-001",
-      "title": "User successfully adds item to cart",
-      "description": "Verify that logged-in user can add product to shopping cart",
-      "type": "FUNCTIONAL",
-      "priority": "HIGH",
-      "tags": ["cart", "checkout", "functional"],
-      "requirementId": "REQ-CART-001",
-      "preconditions": [
-        "User is logged in",
-        "Product is in stock",
-        "Shopping cart is empty"
-      ],
-      "steps": [
-        {
-          "order": 1,
-          "action": "Navigate to product page",
-          "expectedResult": "Product details page loads successfully",
-          "testData": "productId: prod456"
-        },
-        {
-          "order": 2,
-          "action": "Click 'Add to Cart' button",
-          "expectedResult": "Item added to cart, cart count updates to 1"
-        },
-        {
-          "order": 3,
-          "action": "Verify cart contents",
-          "expectedResult": "Cart displays product with correct price and quantity"
-        }
-      ],
-      "gherkin": "Feature: Shopping Cart\n  Scenario: Add item to cart\n    Given user is logged in\n    And product 'iPhone 14' is in stock\n    When user navigates to product page\n    And user clicks 'Add to Cart' button\n    Then product is added to cart\n    And cart count increases by 1",
-      "testData": {
-        "items": [
-          {"field": "userId", "value": "user123", "description": "Test user"},
-          {"field": "productId", "value": "prod456", "description": "Product ID"},
-          {"field": "quantity", "value": "1", "description": "Quantity to add"}
-        ]
-      },
-      "expectedResult": "Product successfully added to cart with correct quantity and price",
-      "postconditions": [
-        "Cart contains 1 item",
-        "Product inventory decremented by 1",
-        "Cart session updated"
-      ],
-      "status": "DRAFT"
-    },
-    {
-      "id": "TC-002",
-      "title": "User cannot add out-of-stock item to cart",
-      "description": "Verify error handling when user attempts to add unavailable product",
-      "type": "NEGATIVE",
-      "priority": "HIGH",
-      "tags": ["cart", "error-handling", "negative"],
-      "requirementId": "REQ-CART-002",
-      "preconditions": [
-        "User is logged in",
-        "Product is out of stock"
-      ],
-      "steps": [
-        {
-          "order": 1,
-          "action": "Navigate to out-of-stock product page",
-          "expectedResult": "Product page loads with 'Out of Stock' message",
-          "testData": "productId: prod789"
-        },
-        {
-          "order": 2,
-          "action": "Attempt to click 'Add to Cart' button",
-          "expectedResult": "'Add to Cart' button is disabled"
-        },
-        {
-          "order": 3,
-          "action": "Verify error message",
-          "expectedResult": "Error message displayed: 'This item is currently out of stock'"
-        }
-      ],
-      "gherkin": "Feature: Shopping Cart\n  Scenario: Cannot add out-of-stock item\n    Given user is logged in\n    And product 'iPhone 14' is out of stock\n    When user navigates to product page\n    Then 'Add to Cart' button is disabled\n    And error message 'Out of Stock' is displayed",
-      "testData": {
-        "items": [
-          {"field": "userId", "value": "user123", "description": "Test user"},
-          {"field": "productId", "value": "prod789", "description": "Out of stock product"}
-        ]
-      },
-      "expectedResult": "User cannot add item, appropriate error message shown",
-      "postconditions": [
-        "Cart remains unchanged",
-        "Error message visible to user"
-      ],
-      "status": "DRAFT"
-    }
-  ],
-  "metadata": {
-    "llmProvider": "anthropic",
-    "llmModel": "claude-3.5-sonnet",
-    "llmTokensUsed": 1234,
-    "generationTimeMs": 12500,
-    "testCasesGenerated": 8,
-    "duplicatesFound": 0,
-    "coverage": {
-      "functionalCount": 5,
-      "negativeCount": 2,
-      "boundaryCount": 1,
-      "edgeCaseCount": 0,
-      "uncoveredAreas": [
-        "Concurrent cart updates",
-        "Cart persistence across sessions"
-      ]
-    },
-    "domainContextUsed": ""
-  }
-}
+**Server Side**:
 ```
-
-### 3.3.3 Multiple Mock Data Sets
-Create 3-4 mock response files for different scenarios:
-- `mock-cart-tests.json` (shopping cart scenarios)
-- `mock-api-tests.json` (API endpoint tests)
-- `mock-login-tests.json` (authentication scenarios)
-- `mock-search-tests.json` (search functionality)
-
-Rotate or select based on input type/keywords detected in form.
-
----
-
-## 4. Non-Functional Requirements
-
-### 4.1 Performance
-- Page load time: < 2 seconds
-- Form submission (mock): < 3 seconds
-- Smooth animations (60 FPS)
-- Image/asset optimization
-- Lazy loading for test case cards (if > 20 cases)
-
-### 4.2 Responsive Design
-**Breakpoints** (Tailwind defaults)
-- Mobile: 640px (single column, stacked form)
-- Tablet: 768px (single column, form sections stacked)
-- Desktop: 1024px+ (two-column layout, side-by-side)
-
-**Mobile Adaptations**:
-- Form configuration: Accordion instead of side panel
-- Test case cards: Full width, simplified view
-- Detail view: Full screen modal instead of side panel
-- Navigation: Hamburger menu for agent selection
-
-### 4.3 Accessibility (WCAG AA)
-- All interactive elements keyboard navigable
-- Focus states visible (Macy's red outline)
-- ARIA labels for all form controls
-- Screen reader announcements for dynamic content
-- Color contrast ratios: 4.5:1 minimum
-- Skip to content links
-- Error messages in `role="alert"` regions
-
-### 4.4 Browser Support
-- Chrome 100+ (primary)
-- Firefox 100+
-- Safari 15+
-- Edge 100+
-- No IE11 support required
-
-### 4.5 Internationalization
-- **Phase 1**: English only
-- **Future**: Prepare for i18n with string externalization
-- Date/time formatting: ISO 8601 → localized display
-- Number formatting: Locale-aware
-
----
-
-## 5. Design System Reference
-
-### 5.1 Design System Location
-All design specifications are documented in:
-```
-/docs/frontend/styles.md
-```
-
-### 5.2 Key Design Elements
-
-**Colors**
-- Primary: Macy's Red (#CE0037)
-- Background: White (#FFFFFF), Light Gray (#F7F7F7)
-- Text: Black (#000000), Gray (#666666)
-- Status: Green (#10B981), Orange (#FFB000), Red (#CE0037)
-
-**Typography**
-- Heading: Plus Jakarta Sans (600/700 weight)
-- Body: Plus Jakarta Sans (400/500 weight)
-- Code: JetBrains Mono
-
-**Component Library**
-- shadcn/ui components (Button, Card, Input, Select, Tabs, Badge, etc.)
-- Custom components built following Macy's theme
-
-**Spacing**
-- Tailwind spacing scale (4px base unit)
-- Section padding: `p-6` (24px)
-- Card margins: `mb-6` (24px)
-
----
-
-## 6. API Integration (Mock in Phase 1)
-
-### 6.1 API Endpoints to Mock
-
-#### 6.1.1 GenerateTestCases
-```
-Endpoint: /api/test-cases/generate (mocked)
-Method: POST
-Request Body: {
-  requestId: string
-  input: UserStoryInput | ApiSpecInput | FreeFormInput
-  generationConfig: {
-    outputFormat: 'TRADITIONAL' | 'GHERKIN' | 'JSON'
-    coverageLevel: 'QUICK' | 'STANDARD' | 'EXHAUSTIVE'
-    testTypes: TestType[]
-    maxTestCases: number
-    priorityFocus?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
-    detailLevel?: 'low' | 'medium' | 'high'
-  }
-}
-
-Response: GenerateTestCasesResponse (see mock data structure above)
-
-Mock Behavior:
-- Delay: 2-3 seconds (simulate LLM call)
-- Return data from mock JSON file
-- Filter by test types selected
-- Adjust count based on coverage level
-```
-
-#### 6.1.2 GetTestCase
-```
-Endpoint: /api/test-cases/{id} (mocked)
-Method: GET
-Path Parameter: id (string)
-
-Response: {
-  testCase: TestCase
-}
-
-Mock Behavior:
-- Return full test case from mock data by ID
-- 404 if ID not found
-```
-
-### 6.2 Mock Implementation Strategy
-
-**Option 1: Client-side mock (Phase 1 preference)**
-```typescript
-// lib/api/mock/testCasesApi.ts
-export async function generateTestCases(request: GenerateRequest) {
-  await sleep(2500); // Simulate API delay
-  const mockData = await import('./data/mock-cart-tests.json');
-  return filterAndTransform(mockData, request);
-}
-
-export async function getTestCase(id: string) {
-  const mockData = await import('./data/mock-cart-tests.json');
-  return mockData.testCases.find(tc => tc.id === id);
-}
-```
-
-**Option 2: Next.js API routes (for future real backend)**
-```
-/app/api/test-cases/generate/route.ts
-/app/api/test-cases/[id]/route.ts
-```
-
-Phase 1: Use Option 1 (simpler, no server needed)
-Phase 2: Switch to Option 2 and replace mock with real gRPC calls
-
----
-
-## 7. User Flows
-
-### 7.1 Primary Flow: Generate Test Cases from User Story
-
-```
-1. User lands on homepage (/)
-2. User clicks "Open" on Test Cases Agent card
-3. User navigates to /test-cases
-4. User sees generation form with "User Story" tab selected
-5. User enters:
-   - Story: "As a customer, I want to add items to cart..."
-   - Acceptance Criteria: 3 criteria added
-6. User selects configuration:
-   - Format: Traditional
-   - Coverage: Standard
-   - Test Types: Functional, Negative (checked)
-7. User clicks "Generate Test Cases"
-8. Loading spinner appears (2-3 seconds)
-9. Results section appears with 8 test case cards
-10. User reviews list, sees TC-001 "User successfully adds item to cart"
-11. User clicks "View Details" on TC-001
-12. Side panel opens showing full test case with steps
-13. User reviews preconditions, steps, expected results
-14. User closes detail panel or navigates to another test case
-```
-
-### 7.2 Alternative Flow: Generate from API Spec
-
-```
-1-3. Same as primary flow
-4. User clicks "API Specification" tab
-5. User selects "OpenAPI" format
-6. User pastes OpenAPI spec (JSON)
-7. User optionally specifies endpoints to test
-8-14. Same as primary flow
-```
-
-### 7.3 Error Flow: Invalid Input
-
-```
-1-5. User fills form with invalid data (e.g., story < 20 characters)
-6. User clicks "Generate Test Cases"
-7. Form validation errors appear in red
-8. Fields with errors highlighted with red border
-9. Error message below field: "Story must be at least 20 characters"
-10. Submit button remains clickable but validation prevents submission
-11. User corrects errors
-12. Validation errors clear
-13. User submits successfully
+Envoy Proxy (localhost:8080)
+  ↓ Protocol Translation (gRPC-Web → gRPC)
+Test Cases Agent (localhost:9003)
+  ↓ gRPC
+LLM Provider (Anthropic)
 ```
-
----
-
-## 8. Out of Scope (Phase 1)
-
-### 8.1 Features Deferred to Phase 2+
-- Real backend API integration (gRPC/REST)
-- Domain Agent integration (DomainConfig)
-- Test Data Agent integration (TestDataConfig)
-- `ListTestCases` API (historical view)
-- `StoreTestCases` API (persistence)
-- `AnalyzeCoverage` API (coverage analysis)
-- User authentication/authorization
-- Export functionality (download test cases)
-- Edit test cases
-- Test case execution/results
-- Test case versioning
-- Collaboration features (comments, sharing)
-
-### 8.2 Technical Debt Accepted
-- Mock data instead of real API calls
-- No state management library (use React hooks)
-- No data persistence (refresh loses data)
-- Limited error handling (basic validation only)
-- No retry logic for failed generations
-
----
-
-## 9. Technical Stack (Finalized)
-
-### 9.1 Frontend Framework
-- **Next.js 14** (App Router)
-- **TypeScript** 5.x
-- **React** 18.x
-
-### 9.2 Styling
-- **Tailwind CSS** 3.x
-- **shadcn/ui** components
-- **Plus Jakarta Sans** (heading/body font)
-- **JetBrains Mono** (code/monospace font)
-
-### 9.3 Data Fetching
-- **Phase 1**: Client-side mock functions
-- **Phase 2**: TBD (gRPC-Web / REST API routes / Server Components)
-
-### 9.4 State Management
-- **React hooks** (useState, useContext)
-- **No Redux/Zustand** for Phase 1
-
-### 9.5 Form Management
-- **React Hook Form** (optional, or plain React state)
-- **Zod** for schema validation (optional)
-
-### 9.6 Code Quality
-- **ESLint** + **Prettier**
-- **TypeScript strict mode**
-- **Husky** for pre-commit hooks (optional)
-
----
-
-## 10. Project Structure
-
-```
-qa-platform/
-├── frontend/                    # Frontend Next.js app (to be created)
-│   ├── app/
-│   │   ├── layout.tsx          # Root layout with header
-│   │   ├── page.tsx            # Landing page (/)
-│   │   ├── test-cases/
-│   │   │   ├── page.tsx        # Test cases agent page
-│   │   │   └── [id]/
-│   │   │       └── page.tsx    # Test case detail page
-│   │   └── api/                # API routes (Phase 2)
-│   │       └── test-cases/
-│   │           ├── generate/
-│   │           └── [id]/
-│   ├── components/
-│   │   ├── layout/
-│   │   │   ├── Header.tsx
-│   │   │   ├── Footer.tsx
-│   │   │   └── Sidebar.tsx
-│   │   ├── test-cases/
-│   │   │   ├── GenerationForm.tsx
-│   │   │   ├── UserStoryTab.tsx
-│   │   │   ├── ApiSpecTab.tsx
-│   │   │   ├── FreeFormTab.tsx
-│   │   │   ├── ConfigPanel.tsx
-│   │   │   ├── TestCaseCard.tsx
-│   │   │   ├── TestCaseList.tsx
-│   │   │   └── TestCaseDetail.tsx
-│   │   ├── landing/
-│   │   │   ├── AgentCard.tsx
-│   │   │   └── StatsPanel.tsx
-│   │   └── ui/                 # shadcn/ui components
-│   │       ├── button.tsx
-│   │       ├── card.tsx
-│   │       ├── input.tsx
-│   │       ├── tabs.tsx
-│   │       └── ...
-│   ├── lib/
-│   │   ├── api/
-│   │   │   ├── mock/
-│   │   │   │   ├── testCasesApi.ts    # Mock API functions
-│   │   │   │   └── data/
-│   │   │   │       ├── mock-cart-tests.json
-│   │   │   │       ├── mock-api-tests.json
-│   │   │   │       └── mock-login-tests.json
-│   │   │   └── types.ts        # TypeScript interfaces from proto
-│   │   └── utils/
-│   │       ├── formatters.ts
-│   │       └── validators.ts
-│   ├── types/
-│   │   └── test-cases.ts       # Proto-generated types (manual for Phase 1)
-│   ├── public/
-│   │   ├── images/
-│   │   └── icons/
-│   ├── tailwind.config.ts
-│   ├── next.config.ts
-│   ├── package.json
-│   └── tsconfig.json
-├── docs/
-│   └── frontend/
-│       ├── PRD.md              # This document
-│       ├── FRONTEND_REQUIREMENTS.md
-│       └── styles.md
-└── protos/
-    └── test_cases.proto        # API contract reference
-```
-
----
-
-## 11. Development Phases
-
-### Phase 1.1: Setup & Foundation (Week 1)
-**Deliverables**:
-- Initialize Next.js 14 project
-- Install dependencies (Tailwind, shadcn/ui, fonts)
-- Set up project structure (folders, base files)
-- Create layout components (Header, Footer)
-- Implement landing page with mock agent cards
-- Set up Tailwind config with Macy's theme
-
-**Tasks** (from Beads):
-- Task 7.1: Initialize Next.js Project
-- Task 7.2: Create Project Structure
-- Task 7.3: Create Layout Components
-- Task 7.4: Build Landing Page
-
-### Phase 1.2: Generation Form (Week 2)
-**Deliverables**:
-- Test Cases Agent page layout
-- All 3 input tabs (User Story, API Spec, Free Form)
-- Configuration panel (format, coverage, test types)
-- Form validation
-- Mock API integration
-
-**Tasks** (from Beads):
-- Task 7.5: Build Test Cases Agent Page - Form
-
-### Phase 1.3: Results Display (Week 2-3)
-**Deliverables**:
-- Loading state animation
-- Test case card list view
-- Filtering and sorting
-- Mock data integration
-- Results metadata display
-
-**Tasks** (from Beads):
-- Task 7.6: Build Test Cases Agent Page - Results Display
-
-### Phase 1.4: Detail View (Week 3)
-**Deliverables**:
-- Test case detail side panel/modal
-- All sections (preconditions, steps, test data, etc.)
-- Format-aware display (Traditional vs Gherkin)
-- Navigation between test cases
-- Close/back functionality
-
-**Tasks** (from Beads):
-- Task 7.7: Build Test Case Detail View
-
-### Phase 1.5: Polish & Testing (Week 4)
-**Deliverables**:
-- Error handling and loading states
-- Responsive design fixes
-- Accessibility improvements
-- Cross-browser testing
-- Performance optimization
-
-**Tasks** (from Beads):
-- Task 7.8: Add Error Handling & Loading States
-- Task 7.9: Responsive Design Testing
-
----
-
-## 12. Testing Strategy
-
-### 12.1 Manual Testing Checklist
-
-**Landing Page**
-- [ ] All agent cards display correctly
-- [ ] Status indicators show correct colors
-- [ ] Stats display with proper formatting
-- [ ] Test Cases Agent link navigates to `/test-cases`
-- [ ] Test Data Agent link opens external URL
-- [ ] eCommerce Agent card is disabled
-- [ ] Responsive on mobile/tablet/desktop
-
-**Test Cases Form**
-- [ ] All 3 input tabs work correctly
-- [ ] Tab switching preserves configuration
-- [ ] User Story tab: all fields validate
-- [ ] API Spec tab: format selector works
-- [ ] Free Form tab: context key-value pairs add/remove
-- [ ] Configuration panel: all options selectable
-- [ ] Advanced settings expand/collapse
-- [ ] Generate button triggers loading state
-- [ ] Reset button clears form
-
-**Results Display**
-- [ ] Loading spinner appears for 2-3 seconds
-- [ ] Test case cards display with correct data
-- [ ] Filtering by type works
-- [ ] Sorting by priority works
-- [ ] Pagination works (if > 10 cases)
-- [ ] Metadata panel shows correct stats
-- [ ] View Details button opens panel
-
-**Detail View**
-- [ ] Side panel/modal opens correctly
-- [ ] All sections display (preconditions, steps, etc.)
-- [ ] Traditional format: steps in table
-- [ ] Gherkin format: code block with syntax
-- [ ] Test data table displays
-- [ ] Navigation: Back to Results works
-- [ ] Close button closes panel
-- [ ] Keyboard ESC closes panel
-
-### 12.2 Automated Testing (Future)
-- Unit tests with Jest + React Testing Library
-- E2E tests with Playwright
-- Visual regression with Percy/Chromatic
-
----
-
-## 13. Success Criteria
-
-### 13.1 Must Have (Phase 1 Complete)
-✅ Landing page displays all 3 agent cards with correct status
-✅ Test Cases Agent page has all 3 input types functional
-✅ User can configure output format, coverage level, test types
-✅ Generate button returns mock test cases
-✅ Test case cards display in list view with filtering
-✅ Detail view shows complete test case information
-✅ Responsive design works on mobile, tablet, desktop
-✅ Design matches Macy's theme (styles.md)
-✅ Page loads in < 2 seconds
-
-### 13.2 Should Have
-⚠ Form validation with helpful error messages
-⚠ Loading states for all async operations
-⚠ Keyboard navigation works throughout
-⚠ WCAG AA accessibility compliance
-
-### 13.3 Nice to Have (Future)
-🔮 Export test cases to JSON/YAML/Markdown
-🔮 Copy test case to clipboard
-🔮 Search/filter within results
-🔮 Dark mode support
-
----
-
-## 14. Open Questions & Decisions Needed
-
-### 14.1 Resolved
-✅ **Q**: Which API communication method?
-**A**: Deferred to Phase 2 (mock data for Phase 1)
-
-✅ **Q**: State management library?
-**A**: React hooks only (no Redux/Zustand)
-
-✅ **Q**: Detail view: modal or side panel?
-**A**: Side panel (keeps context visible)
-
-### 14.2 Pending
-❓ **Q**: Should we use React Hook Form or plain state?
-**Decision by**: Before Phase 1.2 starts
-
-❓ **Q**: TypeScript interfaces: manual or proto-generated?
-**Decision by**: Before Phase 1.1 starts
-**Context**: Need proto compiler setup for TS types
-
-❓ **Q**: Export functionality: Phase 1 or Phase 2?
-**Decision by**: During Phase 1.4
-**Context**: Easy to add, might be valuable early
-
----
-
-## 15. Risks & Mitigations
-
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| Design system inconsistency | Medium | Medium | Reference styles.md for all components |
-| Mock data feels too fake | Low | High | Create realistic, varied mock data sets |
-| Proto types don't match UI needs | Medium | Low | Manual review of proto file before coding |
-| Form complexity overwhelming | High | Medium | Progressive disclosure, good defaults |
-| Performance issues with large lists | Medium | Low | Pagination + virtualization if needed |
-| Accessibility overlooked | High | Medium | ARIA labels from start, test with screen reader |
-
----
 
-## 16. Appendix
+### 3.2 Proto File Contract
+Source: `/protos/test_cases.proto`
 
-### 16.1 Proto File Reference
-Location: `/protos/test_cases.proto`
+**Key Services** (Phase 1):
+1. `GenerateTestCases` - Primary generation endpoint
+2. `GetTestCase` - Fetch individual test case
+3. `HealthCheck` - Service status
 
-**Key Messages Used**:
-- `GenerateTestCasesRequest`
-- `GenerateTestCasesResponse`
-- `TestCase`
-- `TestStep`
-- `TestData`
-- `GenerationConfig`
-- `GenerationMetadata`
-- `CoverageAnalysis`
+**Key Messages**:
+- `GenerateTestCasesRequest` (input, config)
+- `GenerateTestCasesResponse` (test cases, metadata)
+- `TestCase` (id, title, steps, test data)
+- `GenerationConfig` (format, coverage, test types)
 
-**Enums Used**:
+**Enums**:
 - `OutputFormat`: TRADITIONAL, GHERKIN, JSON
 - `CoverageLevel`: QUICK, STANDARD, EXHAUSTIVE
 - `TestType`: FUNCTIONAL, NEGATIVE, BOUNDARY, etc. (23 types)
 - `Priority`: CRITICAL, HIGH, MEDIUM, LOW
-- `TestCaseStatus`: DRAFT, READY, IN_PROGRESS, PASSED, FAILED, BLOCKED, SKIPPED
 
-### 16.2 Design Assets
-- Macy's logo/icon: TBD
-- Agent icons: TBD (use emoji or generic icons for Phase 1)
-- Status indicator colors defined in styles.md
+---
 
-### 16.3 External Dependencies
-- Test Data Agent UI: Existing, link from landing page
-- eCommerce Domain Agent: Not yet built (show as "Coming Soon")
+## 4. Envoy Proxy Setup
+
+### 4.1 Configuration File
+
+**Location**: `/envoy/envoy.yaml`
+
+```yaml
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8080
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                codec_type: auto
+                stat_prefix: ingress_http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/testcases.v1.TestCasesService"
+                          route:
+                            cluster: test_cases_service
+                            timeout: 0s
+                            max_stream_duration:
+                              grpc_timeout_header_max: 60s
+                      cors:
+                        allow_origin_string_match:
+                          - prefix: "*"
+                        allow_methods: GET, PUT, DELETE, POST, OPTIONS
+                        allow_headers: keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,x-user-agent,x-grpc-web,grpc-timeout
+                        max_age: "1728000"
+                        expose_headers: grpc-status,grpc-message
+                http_filters:
+                  - name: envoy.filters.http.grpc_web
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
+                  - name: envoy.filters.http.cors
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: test_cases_service
+      connect_timeout: 0.25s
+      type: logical_dns
+      http2_protocol_options: {}
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: test_cases_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal  # For Docker
+                      # address: localhost           # For local envoy binary
+                      port_value: 9003
+```
+
+### 4.2 Running Envoy
+
+**Using Docker** (Recommended):
+```bash
+# Start Envoy proxy
+docker run -d \
+  --name envoy-proxy \
+  -v "$(pwd)/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro" \
+  -p 8080:8080 \
+  envoyproxy/envoy:v1.31-latest
+
+# View logs
+docker logs -f envoy-proxy
+
+# Stop
+docker stop envoy-proxy && docker rm envoy-proxy
+```
+
+**Using Binary**:
+```bash
+# Install envoy (macOS)
+brew install envoy
+
+# Run
+envoy -c envoy/envoy.yaml
+```
+
+### 4.3 Health Check
+```bash
+# Test Envoy is running
+curl http://localhost:8080/stats/prometheus
+
+# Expected: Prometheus metrics
+```
+
+---
+
+## 5. Proto Compilation Pipeline
+
+### 5.1 Required Tools
+
+```bash
+# Install protoc (protocol buffer compiler)
+# macOS
+brew install protobuf
+
+# Install grpc-web plugin
+npm install -g protoc-gen-grpc-web
+
+# Or download from:
+# https://github.com/grpc/grpc-web/releases
+```
+
+### 5.2 Code Generation Script
+
+**Location**: `/frontend/scripts/generate-proto.sh`
+
+```bash
+#!/bin/bash
+
+set -e
+
+PROTO_DIR="../protos"
+OUT_DIR="./lib/grpc/generated"
+
+echo "Generating TypeScript code from proto files..."
+
+# Create output directory
+mkdir -p $OUT_DIR
+
+# Generate JavaScript/TypeScript code
+protoc \
+  -I=$PROTO_DIR \
+  test_cases.proto \
+  --js_out=import_style=commonjs,binary:$OUT_DIR \
+  --grpc-web_out=import_style=typescript,mode=grpcwebtext:$OUT_DIR
+
+echo "✓ Proto files generated successfully!"
+echo "  Output: $OUT_DIR/"
+ls -lh $OUT_DIR/
+```
+
+**Make executable**:
+```bash
+chmod +x scripts/generate-proto.sh
+```
+
+### 5.3 Generated Files
+
+After running `./scripts/generate-proto.sh`:
+
+```
+lib/grpc/generated/
+├── test_cases_pb.js              # Message classes (JS)
+├── test_cases_pb.d.ts            # Message types (TS declarations)
+├── test_cases_grpc_web_pb.js     # Service client (JS)
+└── test_cases_grpc_web_pb.d.ts   # Service client types (TS)
+```
+
+### 5.4 Package.json Integration
+
+```json
+{
+  "scripts": {
+    "proto:gen": "bash ./scripts/generate-proto.sh",
+    "proto:watch": "nodemon --watch ../protos --exec npm run proto:gen",
+    "postinstall": "npm run proto:gen",
+    "dev": "npm run proto:gen && next dev",
+    "build": "npm run proto:gen && next build"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
+```
+
+---
+
+## 6. Frontend Implementation
+
+### 6.1 Dependencies
+
+**Install gRPC-Web**:
+```bash
+npm install grpc-web
+npm install --save-dev @types/google-protobuf
+```
+
+**Full package.json dependencies**:
+```json
+{
+  "dependencies": {
+    "next": "14.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "grpc-web": "^1.5.0",
+    "tailwindcss": "^3.4.0",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-select": "^2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.3.0",
+    "@types/google-protobuf": "^3.15.12",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32"
+  }
+}
+```
+
+### 6.2 gRPC-Web Client Service
+
+**Location**: `/frontend/lib/grpc/testCasesClient.ts`
+
+```typescript
+import { TestCasesServiceClient } from './generated/test_cases_grpc_web_pb';
+
+// Client points to Envoy proxy
+const GRPC_WEB_URL = process.env.NEXT_PUBLIC_GRPC_WEB_URL || 'http://localhost:8080';
+
+// Create singleton client instance
+export const testCasesClient = new TestCasesServiceClient(
+  GRPC_WEB_URL,
+  null,  // credentials (null for insecure)
+  null   // options
+);
+
+export default testCasesClient;
+```
+
+**Environment variables**:
+```bash
+# .env.local
+NEXT_PUBLIC_GRPC_WEB_URL=http://localhost:8080
+
+# Production
+# NEXT_PUBLIC_GRPC_WEB_URL=https://grpc.example.com
+```
+
+### 6.3 React Hook: useGenerateTestCases
+
+**Location**: `/frontend/hooks/useGenerateTestCases.ts`
+
+```typescript
+import { useState } from 'react';
+import testCasesClient from '@/lib/grpc/testCasesClient';
+import {
+  GenerateTestCasesRequest,
+  UserStoryInput,
+  ApiSpecInput,
+  FreeFormInput,
+  GenerationConfig,
+  OutputFormat,
+  CoverageLevel,
+  TestType
+} from '@/lib/grpc/generated/test_cases_pb';
+
+export interface GenerateFormData {
+  inputType: 'user_story' | 'api_spec' | 'free_form';
+  // User Story fields
+  story?: string;
+  acceptanceCriteria?: string[];
+  additionalContext?: string;
+  // API Spec fields
+  apiSpec?: string;
+  specFormat?: 'openapi' | 'graphql';
+  endpoints?: string[];
+  // Free Form fields
+  freeFormText?: string;
+  freeFormContext?: Record<string, string>;
+  // Generation config
+  outputFormat: 'TRADITIONAL' | 'GHERKIN' | 'JSON';
+  coverageLevel: 'QUICK' | 'STANDARD' | 'EXHAUSTIVE';
+  testTypes: string[];
+  maxTestCases?: number;
+  priorityFocus?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  detailLevel?: 'low' | 'medium' | 'high';
+}
+
+export function useGenerateTestCases() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [testCases, setTestCases] = useState<any[]>([]);
+  const [metadata, setMetadata] = useState<any>(null);
+
+  const generateTestCases = async (formData: GenerateFormData) => {
+    setLoading(true);
+    setError(null);
+    setTestCases([]);
+    setMetadata(null);
+
+    try {
+      // Build proto request
+      const request = new GenerateTestCasesRequest();
+      request.setRequestId(`req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+
+      // Set input based on type
+      if (formData.inputType === 'user_story') {
+        const userStory = new UserStoryInput();
+        userStory.setStory(formData.story || '');
+        userStory.setAcceptanceCriteriaList(formData.acceptanceCriteria || []);
+        if (formData.additionalContext) {
+          userStory.setAdditionalContext(formData.additionalContext);
+        }
+        request.setUserStory(userStory);
+      } else if (formData.inputType === 'api_spec') {
+        const apiSpec = new ApiSpecInput();
+        apiSpec.setSpec(formData.apiSpec || '');
+        apiSpec.setSpecFormat(formData.specFormat || 'openapi');
+        if (formData.endpoints && formData.endpoints.length > 0) {
+          apiSpec.setEndpointsList(formData.endpoints);
+        }
+        request.setApiSpec(apiSpec);
+      } else if (formData.inputType === 'free_form') {
+        const freeForm = new FreeFormInput();
+        freeForm.setRequirement(formData.freeFormText || '');
+        if (formData.freeFormContext) {
+          const contextMap = freeForm.getContextMap();
+          Object.entries(formData.freeFormContext).forEach(([key, value]) => {
+            contextMap.set(key, value);
+          });
+        }
+        request.setFreeForm(freeForm);
+      }
+
+      // Set generation config
+      const config = new GenerationConfig();
+
+      // Output format
+      const formatEnum = OutputFormat[formData.outputFormat as keyof typeof OutputFormat];
+      config.setOutputFormat(formatEnum);
+
+      // Coverage level
+      const coverageEnum = CoverageLevel[formData.coverageLevel as keyof typeof CoverageLevel];
+      config.setCoverageLevel(coverageEnum);
+
+      // Test types
+      const testTypeEnums = formData.testTypes.map(
+        t => TestType[t as keyof typeof TestType]
+      );
+      config.setTestTypesList(testTypeEnums);
+
+      // Optional fields
+      if (formData.maxTestCases) {
+        config.setMaxTestCases(formData.maxTestCases);
+      }
+      if (formData.priorityFocus) {
+        config.setPriorityFocus(formData.priorityFocus.toLowerCase());
+      }
+      if (formData.detailLevel) {
+        config.setDetailLevel(formData.detailLevel);
+      }
+
+      request.setGenerationConfig(config);
+
+      // Call gRPC-Web service
+      const response = await new Promise<any>((resolve, reject) => {
+        testCasesClient.generateTestCases(request, {}, (err, response) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(response);
+          }
+        });
+      });
+
+      // Convert proto response to plain objects
+      const testCasesList = response.getTestCasesList();
+      const testCasesData = testCasesList.map((tc: any) => tc.toObject());
+
+      setTestCases(testCasesData);
+
+      if (response.hasMetadata()) {
+        setMetadata(response.getMetadata().toObject());
+      }
+
+    } catch (err: any) {
+      console.error('gRPC-Web Error:', err);
+
+      // Handle gRPC error codes
+      let errorMessage = 'Failed to generate test cases';
+
+      if (err.code === 14) {
+        errorMessage = 'Service unavailable. Please ensure Test Cases Agent and Envoy proxy are running.';
+      } else if (err.code === 4) {
+        errorMessage = 'Request timed out. Test case generation may take up to 60 seconds.';
+      } else if (err.code === 3) {
+        errorMessage = 'Invalid input. Please check your form data.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    generateTestCases,
+    loading,
+    error,
+    testCases,
+    metadata
+  };
+}
+```
+
+### 6.4 Component Usage Example
+
+**Location**: `/frontend/components/test-cases/GenerationForm.tsx`
+
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { useGenerateTestCases } from '@/hooks/useGenerateTestCases';
+import type { GenerateFormData } from '@/hooks/useGenerateTestCases';
+
+export function GenerationForm() {
+  const { generateTestCases, loading, error, testCases, metadata } = useGenerateTestCases();
+
+  const [formData, setFormData] = useState<GenerateFormData>({
+    inputType: 'user_story',
+    story: '',
+    acceptanceCriteria: [''],
+    outputFormat: 'TRADITIONAL',
+    coverageLevel: 'STANDARD',
+    testTypes: ['FUNCTIONAL', 'NEGATIVE'],
+    maxTestCases: 10
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await generateTestCases(formData);
+  };
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Input Type Tabs */}
+        <div>
+          <label>Input Type</label>
+          <select
+            value={formData.inputType}
+            onChange={(e) => setFormData({
+              ...formData,
+              inputType: e.target.value as any
+            })}
+          >
+            <option value="user_story">User Story</option>
+            <option value="api_spec">API Specification</option>
+            <option value="free_form">Free Form</option>
+          </select>
+        </div>
+
+        {/* User Story Fields */}
+        {formData.inputType === 'user_story' && (
+          <div>
+            <label>Story</label>
+            <textarea
+              value={formData.story}
+              onChange={(e) => setFormData({ ...formData, story: e.target.value })}
+              placeholder="As a customer, I want to..."
+              required
+            />
+          </div>
+        )}
+
+        {/* Config Fields */}
+        <div>
+          <label>Output Format</label>
+          <select
+            value={formData.outputFormat}
+            onChange={(e) => setFormData({
+              ...formData,
+              outputFormat: e.target.value as any
+            })}
+          >
+            <option value="TRADITIONAL">Traditional</option>
+            <option value="GHERKIN">Gherkin</option>
+            <option value="JSON">JSON</option>
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="bg-[#CE0037] text-white px-6 py-2 rounded"
+        >
+          {loading ? 'Generating...' : 'Generate Test Cases'}
+        </button>
+      </form>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
+
+      {/* Results Display */}
+      {testCases.length > 0 && (
+        <div>
+          <h3>Generated {testCases.length} Test Cases</h3>
+          {testCases.map((tc, idx) => (
+            <div key={idx} className="border p-4 rounded mb-2">
+              <h4>{tc.title}</h4>
+              <p>Type: {tc.type}</p>
+              <p>Priority: {tc.priority}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 7. Deployment Configuration
+
+### 7.1 Docker Compose (Full Stack)
+
+**Location**: `/docker-compose.yml`
+
+```yaml
+version: '3.8'
+
+services:
+  # Test Cases Agent (gRPC backend)
+  test-cases-agent:
+    build: ./agents/test-cases-agent
+    ports:
+      - "9003:9003"      # gRPC port
+      - "8083:8083"      # HTTP health check
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GRPC_PORT=9003
+      - HTTP_PORT=8083
+    networks:
+      - qa-platform
+
+  # Envoy Proxy (gRPC-Web gateway)
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    ports:
+      - "8080:8080"      # gRPC-Web port
+      - "9901:9901"      # Envoy admin
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    depends_on:
+      - test-cases-agent
+    networks:
+      - qa-platform
+
+  # Frontend (Next.js)
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_GRPC_WEB_URL=http://localhost:8080
+    depends_on:
+      - envoy
+    networks:
+      - qa-platform
+
+networks:
+  qa-platform:
+    driver: bridge
+```
+
+### 7.2 Start/Stop Scripts
+
+**start-all.sh**:
+```bash
+#!/bin/bash
+
+echo "Starting QA Platform services..."
+
+# Start test-cases-agent
+echo "→ Starting Test Cases Agent (gRPC)"
+cd agents/test-cases-agent && python -m test_cases_agent.main &
+AGENT_PID=$!
+echo "  PID: $AGENT_PID"
+
+sleep 3
+
+# Start Envoy proxy
+echo "→ Starting Envoy Proxy (gRPC-Web)"
+docker run -d \
+  --name envoy-proxy \
+  -v "$(pwd)/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro" \
+  -p 8080:8080 \
+  envoyproxy/envoy:v1.31-latest
+
+sleep 2
+
+# Start Frontend
+echo "→ Starting Frontend (Next.js)"
+cd frontend && npm run dev &
+FRONTEND_PID=$!
+echo "  PID: $FRONTEND_PID"
+
+echo ""
+echo "✓ All services started!"
+echo "  Test Cases Agent: localhost:9003 (gRPC)"
+echo "  Envoy Proxy:      localhost:8080 (gRPC-Web)"
+echo "  Frontend:         localhost:3000 (HTTP)"
+echo ""
+echo "Press Ctrl+C to stop all services"
+
+# Wait for Ctrl+C
+trap "echo 'Stopping services...'; kill $AGENT_PID $FRONTEND_PID; docker stop envoy-proxy; docker rm envoy-proxy; exit" INT
+wait
+```
+
+---
+
+## 8. Testing & Debugging
+
+### 8.1 Testing gRPC-Web Connection
+
+**Test with grpcurl** (requires `grpc-reflection`):
+```bash
+# Test direct gRPC (port 9003)
+grpcurl -plaintext localhost:9003 testcases.v1.TestCasesService/HealthCheck
+
+# Test via Envoy (port 8080) - requires gRPC-Web client
+# Use browser DevTools Network tab instead
+```
+
+**Test with Browser DevTools**:
+1. Open browser DevTools → Network tab
+2. Generate test cases via UI
+3. Look for requests to `localhost:8080`
+4. Check request/response headers for `grpc-status`, `grpc-message`
+
+### 8.2 Common Errors & Solutions
+
+**Error**: "Failed to fetch" or CORS error
+- **Solution**: Check Envoy CORS configuration
+- Verify `allow_origin_string_match` includes frontend origin
+
+**Error**: "Code 14: UNAVAILABLE"
+- **Solution**: Test Cases Agent not running
+- Start agent: `cd agents/test-cases-agent && python -m test_cases_agent.main`
+
+**Error**: "Code 4: DEADLINE_EXCEEDED"
+- **Solution**: Request timeout
+- Increase timeout in Envoy config: `grpc_timeout_header_max: 120s`
+
+**Error**: Proto compilation fails
+- **Solution**: Check protoc installation
+- Verify proto file syntax: `protoc --decode_raw < test_cases.proto`
+
+---
+
+## 9. Project Structure
+
+```
+qa-platform/
+├── frontend/                       # Next.js frontend
+│   ├── app/
+│   │   ├── layout.tsx
+│   │   ├── page.tsx                # Landing page
+│   │   ├── test-cases/
+│   │   │   └── page.tsx            # Test cases agent page
+│   │   └── globals.css
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── Header.tsx
+│   │   │   └── Footer.tsx
+│   │   └── test-cases/
+│   │       ├── GenerationForm.tsx
+│   │       ├── UserStoryTab.tsx
+│   │       ├── TestCaseCard.tsx
+│   │       └── TestCaseDetail.tsx
+│   ├── hooks/
+│   │   └── useGenerateTestCases.ts
+│   ├── lib/
+│   │   └── grpc/
+│   │       ├── testCasesClient.ts
+│   │       └── generated/           # Auto-generated from proto
+│   │           ├── test_cases_pb.js
+│   │           ├── test_cases_pb.d.ts
+│   │           ├── test_cases_grpc_web_pb.js
+│   │           └── test_cases_grpc_web_pb.d.ts
+│   ├── scripts/
+│   │   └── generate-proto.sh
+│   ├── package.json
+│   ├── next.config.js
+│   ├── tailwind.config.ts
+│   └── tsconfig.json
+├── envoy/
+│   └── envoy.yaml                  # Envoy proxy config
+├── protos/
+│   └── test_cases.proto            # gRPC service definition
+├── agents/
+│   └── test-cases-agent/           # Python gRPC service
+├── docs/
+│   └── frontend/
+│       ├── PRD.md                  # This document
+│       ├── FRONTEND_REQUIREMENTS.md
+│       └── styles.md
+├── docker-compose.yml
+├── start-all.sh
+└── stop-all.sh
+```
+
+---
+
+## 10. Development Roadmap
+
+### Phase 1.1: Setup (Week 1)
+- [ ] Initialize Next.js project
+- [ ] Install gRPC-Web dependencies
+- [ ] Set up proto compilation pipeline
+- [ ] Configure Envoy proxy
+- [ ] Create project structure
+- [ ] Build layout components (Header, Footer)
+- [ ] Build landing page
+
+### Phase 1.2: Generation Form (Week 2)
+- [ ] Create gRPC-Web client service
+- [ ] Implement useGenerateTestCases hook
+- [ ] Build all 3 input tabs (User Story, API Spec, Free Form)
+- [ ] Build configuration panel
+- [ ] Wire up proto message building
+- [ ] Test end-to-end generation flow
+
+### Phase 1.3: Results Display (Week 2-3)
+- [ ] Build test case card list view
+- [ ] Implement proto response parsing
+- [ ] Add filtering/sorting
+- [ ] Display generation metadata
+- [ ] Handle loading and error states
+
+### Phase 1.4: Detail View (Week 3)
+- [ ] Build test case detail panel
+- [ ] Display all test case sections
+- [ ] Format Gherkin vs Traditional display
+- [ ] Add navigation between test cases
+
+### Phase 1.5: Polish & Testing (Week 4)
+- [ ] Error handling improvements
+- [ ] Responsive design
+- [ ] Accessibility improvements
+- [ ] Cross-browser testing
+- [ ] Performance optimization
+- [ ] Documentation
+
+---
+
+## 11. Success Criteria
+
+### Technical Requirements
+✅ Proto compilation integrated into build process
+✅ Envoy proxy running and configured
+✅ gRPC-Web client successfully calling backend
+✅ All proto message types properly generated
+✅ Form data correctly converted to proto messages
+✅ Proto responses correctly parsed and displayed
+
+### Functional Requirements
+✅ All 3 input types working (User Story, API Spec, Free Form)
+✅ All configuration options functional
+✅ Test cases generated and displayed
+✅ Detail view shows complete test case
+✅ Error handling for network/service failures
+✅ Loading states during generation
+
+### Non-Functional Requirements
+✅ Type-safe proto-to-TS conversion
+✅ No manual JSON/proto serialization
+✅ Responsive on mobile/tablet/desktop
+✅ WCAG AA accessibility
+✅ Macy's brand theme applied
+
+---
+
+## 12. Appendix
+
+### 12.1 Environment Variables
+
+```bash
+# Frontend (.env.local)
+NEXT_PUBLIC_GRPC_WEB_URL=http://localhost:8080
+
+# Test Cases Agent
+ANTHROPIC_API_KEY=sk-ant-...
+GRPC_PORT=9003
+HTTP_PORT=8083
+```
+
+### 12.2 Proto Reference
+
+**Service**: `testcases.v1.TestCasesService`
+
+**Methods**:
+- `GenerateTestCases(GenerateTestCasesRequest) returns (GenerateTestCasesResponse)`
+- `GetTestCase(GetTestCaseRequest) returns (GetTestCaseResponse)`
+- `HealthCheck(HealthCheckRequest) returns (HealthCheckResponse)`
+
+**Full proto**: `/protos/test_cases.proto`
 
 ---
 
@@ -1145,14 +932,15 @@ Location: `/protos/test_cases.proto`
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 1.0 | 2025-12-21 | Claude (AI) | Initial draft based on requirements gathering |
+| 2.0 | 2025-12-21 | Claude (AI) | Complete rewrite for gRPC-Web architecture |
 
 **Approval Required From**:
-- [ ] Product Owner (User/Client)
+- [ ] Product Owner
 - [ ] Tech Lead
-- [ ] UX/Design Lead
+- [ ] DevOps Lead (for Envoy setup)
 
-**Next Steps After Approval**:
-1. Create Beads task updates to match PRD scope
-2. Sync PRD with development team
-3. Begin Phase 1.1 implementation
+**Next Steps**:
+1. Approve gRPC-Web architecture
+2. Set up Envoy proxy in local environment
+3. Test proto compilation pipeline
+4. Begin Phase 1.1 implementation
