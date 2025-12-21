@@ -44,6 +44,56 @@ cat SHARED_CONTEXT.md
 
 ---
 
+## Implementation Task Planning
+
+**REQUIRED:** All implementation tasks MUST be tracked using bd (beads) commands.
+
+### Creating Implementation Tasks
+
+```bash
+# Create a bug fix task
+bd create "Fix proto field name mismatch in service.py" \
+  -t bug -p 1 \
+  -l "test-cases-agent,proto-alignment"
+
+# Create a feature implementation task
+bd create "Implement user authentication flow" \
+  -t feature -p 2 \
+  -l "test-cases-agent,authentication"
+
+# Create a chore/refactoring task
+bd create "Refactor LLM client to use only Anthropic" \
+  -t chore -p 2 \
+  -l "test-cases-agent,llm"
+```
+
+### Working on Tasks
+
+```bash
+# Start working on a task
+bd start <issue-id>
+
+# Add implementation notes
+bd comment <issue-id> "Fixed field names: story_text -> story, entity_type removed"
+
+# Mark task as completed
+bd close <issue-id> --reason "Implementation complete and tested"
+```
+
+### Syncing Changes
+
+```bash
+# Sync all changes to the bead
+bd sync
+
+# Push to git
+git add -A
+git commit -m "Fix: Proto field name alignment in test-cases-agent"
+git push
+```
+
+---
+
 ## Session End Protocol
 
 ```bash

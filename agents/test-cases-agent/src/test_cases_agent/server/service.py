@@ -81,13 +81,11 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
                 success=generation_response.success,
                 test_cases=proto_test_cases,
                 metadata=test_cases_pb2.GenerationMetadata(
-                    total_generated=generation_response.count,
+                    test_cases_generated=generation_response.count,
                     generation_time_ms=generation_response.generation_time_ms,
                     llm_provider=generation_response.llm_provider,
-                    model_used="",  # TODO: Get actual model from response
-                    prompt_tokens=generation_response.tokens_used or 0,
-                    completion_tokens=0,
-                    confidence_score=generation_response.coverage_summary.get("coverage_score", 0.0) / 100 if generation_response.coverage_summary else 0.8,
+                    llm_model=getattr(generation_response, 'llm_model', ''),
+                    llm_tokens_used=generation_response.tokens_used or 0,
                 ),
                 error_message=generation_response.error if not generation_response.success else "",
             )
@@ -344,10 +342,8 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
             HealthCheckResponse with service status
         """
         return test_cases_pb2.HealthCheckResponse(
-            status=test_cases_pb2.HealthCheckResponse.SERVING,
-            version="1.0.0",
-            uptime_seconds=0,  # TODO: Track actual uptime
-            active_requests=0,  # TODO: Track active requests
+            status=test_cases_pb2.HealthCheckStatus.SERVING,
+            version="1.0.0"
         )
 
     def _build_test_case_request(self, proto_request: test_cases_pb2.GenerateTestCasesRequest) -> TestCaseRequest:
@@ -358,21 +354,23 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
         domain_context = {}
 
         if proto_request.HasField("user_story"):
-            requirement = proto_request.user_story.story_text
-            entity_type = proto_request.user_story.entity_type or "general"
+            requirement = proto_request.user_story.story
+            entity_type = "user_story"
             domain_context["acceptance_criteria"] = list(proto_request.user_story.acceptance_criteria)
+            if proto_request.user_story.additional_context:
+                domain_context["additional_context"] = proto_request.user_story.additional_context
         elif proto_request.HasField("api_spec"):
-            requirement = f"API: {proto_request.api_spec.endpoint} ({proto_request.api_spec.method})"
+            requirement = f"API Spec ({proto_request.api_spec.spec_format})"
             entity_type = "api"
             domain_context["api_details"] = {
-                "method": proto_request.api_spec.method,
-                "endpoint": proto_request.api_spec.endpoint,
-                "parameters": list(proto_request.api_spec.parameters),
+                "spec": proto_request.api_spec.spec,
+                "spec_format": proto_request.api_spec.spec_format,
+                "endpoints": list(proto_request.api_spec.endpoints) if proto_request.api_spec.endpoints else [],
             }
         elif proto_request.HasField("free_form"):
-            requirement = proto_request.free_form.requirement_text
-            entity_type = proto_request.free_form.context_info.get("entity_type", "general")
-            domain_context = dict(proto_request.free_form.context_info)
+            requirement = proto_request.free_form.requirement
+            entity_type = proto_request.free_form.context.get("entity_type", "general") if proto_request.free_form.context else "general"
+            domain_context = dict(proto_request.free_form.context) if proto_request.free_form.context else {}
 
         # Build config
         config = proto_request.generation_config
@@ -381,9 +379,9 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
             entity_type=entity_type,
             test_types=[self._proto_to_model_test_type(tt) for tt in config.test_types] if config.test_types else None,
             count=config.count or 5,
-            priority_focus=self._proto_to_model_priority(config.priority_focus) if config.priority_focus else None,
-            include_edge_cases=config.include_edge_cases if config.HasField("include_edge_cases") else True,
-            include_negative_tests=config.include_negative_tests if config.HasField("include_negative_tests") else True,
+            priority_focus=self._proto_to_model_priority(config.priority_focus) if hasattr(config, 'priority_focus') and config.priority_focus else None,
+            include_edge_cases=config.include_edge_cases if hasattr(config, 'include_edge_cases') else True,
+            include_negative_tests=config.include_negative_tests if hasattr(config, 'include_negative_tests') else True,
             detail_level=config.detail_level or "medium",
             domain_context=domain_context,
         )
@@ -393,28 +391,24 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
         proto_steps = []
         for step in tc.steps:
             proto_steps.append(test_cases_pb2.TestStep(
-                step_number=step.step_number,
+                order=step.step_number,
                 action=step.action,
                 expected_result=step.expected_result,
                 test_data=json.dumps(step.test_data) if step.test_data else "",
-                validation_criteria=step.validation or "",
             ))
 
         return test_cases_pb2.TestCase(
             id=tc.id,
             title=tc.title,
             description=tc.description,
-            test_type=self._model_to_proto_test_type(tc.test_type),
+            type=self._model_to_proto_test_type(tc.test_type),
             priority=self._model_to_proto_priority(tc.priority),
             status=test_cases_pb2.TestCaseStatus.DRAFT,
             preconditions=tc.preconditions.split("\n") if tc.preconditions else [],
             steps=proto_steps,
             postconditions=tc.postconditions.split("\n") if tc.postconditions else [],
-            test_data=json.dumps(tc.test_data) if tc.test_data else "",
-            expected_results=tc.expected_results or "",
+            expected_result=tc.expected_results or "",
             tags=tc.metadata.tags if tc.metadata else [],
-            categories=tc.metadata.categories if tc.metadata else [],
-            created_at=int(tc.metadata.created_at.timestamp()) if tc.metadata and tc.metadata.created_at else 0,
         )
 
     def _proto_to_model_test_type(self, proto_type: test_cases_pb2.TestType) -> TestType:
@@ -449,7 +443,7 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
         }
         return mapping.get(model_type, test_cases_pb2.TestType.FUNCTIONAL)
 
-    def _proto_to_model_priority(self, proto_priority: test_cases_pb2.Priority) -> Priority:
+    def _proto_to_model_priority(self, proto_priority) -> Priority:
         """Convert proto Priority to model Priority."""
         mapping = {
             test_cases_pb2.Priority.CRITICAL: Priority.CRITICAL,
@@ -459,7 +453,7 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
         }
         return mapping.get(proto_priority, Priority.MEDIUM)
 
-    def _model_to_proto_priority(self, model_priority: str) -> test_cases_pb2.Priority:
+    def _model_to_proto_priority(self, model_priority: str):
         """Convert model Priority to proto Priority."""
         mapping = {
             "critical": test_cases_pb2.Priority.CRITICAL,
@@ -467,4 +461,4 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
             "medium": test_cases_pb2.Priority.MEDIUM,
             "low": test_cases_pb2.Priority.LOW,
         }
-        return mapping.get(model_priority, test_cases_pb2.Priority.MEDIUM)
+        return mapping.get(model_priority.lower(), test_cases_pb2.Priority.MEDIUM)
