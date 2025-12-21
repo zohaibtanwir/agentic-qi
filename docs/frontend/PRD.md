@@ -91,8 +91,13 @@ Source: `/protos/test_cases.proto`
 
 **Key Services** (Phase 1):
 1. `GenerateTestCases` - Primary generation endpoint
-2. `GetTestCase` - Fetch individual test case
-3. `HealthCheck` - Service status
+2. `GetTestCase` - Fetch individual test case by ID
+3. `HealthCheck` - Service status for landing page
+
+**Future Services** (Phase 2):
+4. `ListTestCases` - Historical test cases with filtering/search
+5. `StoreTestCases` - Persist to vector DB for learning
+6. `AnalyzeCoverage` - Coverage gap analysis
 
 **Key Messages**:
 - `GenerateTestCasesRequest` (input, config)
@@ -100,11 +105,23 @@ Source: `/protos/test_cases.proto`
 - `TestCase` (id, title, steps, test data)
 - `GenerationConfig` (format, coverage, test types)
 
+**Configuration Messages**:
+- `DomainConfig` (Phase 2) - Domain enrichment from eCommerce Agent
+- `TestDataConfig` (Phase 2) - Test data generation from Test Data Agent
+
 **Enums**:
 - `OutputFormat`: TRADITIONAL, GHERKIN, JSON
 - `CoverageLevel`: QUICK, STANDARD, EXHAUSTIVE
-- `TestType`: FUNCTIONAL, NEGATIVE, BOUNDARY, etc. (23 types)
+- `TestType`: 20 types total:
+  - **Functional**: FUNCTIONAL, ACCEPTANCE, SMOKE, REGRESSION
+  - **Non-Functional**: PERFORMANCE, LOAD, STRESS, RECOVERY
+  - **Quality**: SECURITY, USABILITY, ACCESSIBILITY, LOCALIZATION
+  - **Technical**: UNIT, INTEGRATION, API, DATABASE
+  - **Risk-Based**: NEGATIVE, BOUNDARY, EDGE_CASE
+  - **Compatibility**: COMPATIBILITY
 - `Priority`: CRITICAL, HIGH, MEDIUM, LOW
+- `TestCaseStatus`: DRAFT, READY, IN_PROGRESS, PASSED, FAILED, BLOCKED, SKIPPED
+- `TestDataPlacement`: EMBEDDED, SEPARATE, BOTH
 
 ---
 
@@ -465,6 +482,7 @@ export function useGenerateTestCases() {
         config.setMaxTestCases(formData.maxTestCases);
       }
       if (formData.priorityFocus) {
+        // Note: priorityFocus is string (not enum) in proto for flexibility
         config.setPriorityFocus(formData.priorityFocus.toLowerCase());
       }
       if (formData.detailLevel) {
@@ -500,14 +518,47 @@ export function useGenerateTestCases() {
       // Handle gRPC error codes
       let errorMessage = 'Failed to generate test cases';
 
-      if (err.code === 14) {
-        errorMessage = 'Service unavailable. Please ensure Test Cases Agent and Envoy proxy are running.';
-      } else if (err.code === 4) {
-        errorMessage = 'Request timed out. Test case generation may take up to 60 seconds.';
-      } else if (err.code === 3) {
-        errorMessage = 'Invalid input. Please check your form data.';
-      } else if (err.message) {
-        errorMessage = err.message;
+      switch (err.code) {
+        case 0:
+          return; // OK - no error
+        case 1:
+          errorMessage = 'Request cancelled. Please try again.';
+          break;
+        case 2:
+          errorMessage = 'Unknown error occurred. Please check logs.';
+          break;
+        case 3:
+          errorMessage = 'Invalid input. Please check your form data.';
+          break;
+        case 4:
+          errorMessage = 'Request timed out. Test case generation may take up to 60 seconds.';
+          break;
+        case 5:
+          errorMessage = 'Test case not found.';
+          break;
+        case 7:
+          errorMessage = 'Permission denied. Check authentication.';
+          break;
+        case 8:
+          errorMessage = 'Rate limit exceeded. Please wait and try again.';
+          break;
+        case 9:
+          errorMessage = 'Prerequisites not met. Check your configuration.';
+          break;
+        case 12:
+          errorMessage = 'Feature not implemented yet.';
+          break;
+        case 13:
+          errorMessage = 'Internal server error. Please contact support.';
+          break;
+        case 14:
+          errorMessage = 'Service unavailable. Please ensure Test Cases Agent and Envoy proxy are running.';
+          break;
+        case 16:
+          errorMessage = 'Authentication required.';
+          break;
+        default:
+          errorMessage = err.message || 'Unknown error occurred';
       }
 
       setError(errorMessage);
@@ -601,6 +652,105 @@ export function GenerationForm() {
             <option value="GHERKIN">Gherkin</option>
             <option value="JSON">JSON</option>
           </select>
+        </div>
+
+        {/* Coverage Level */}
+        <div>
+          <label>Coverage Level</label>
+          <select
+            value={formData.coverageLevel}
+            onChange={(e) => setFormData({
+              ...formData,
+              coverageLevel: e.target.value as any
+            })}
+          >
+            <option value="QUICK">Quick (Happy path + critical negatives)</option>
+            <option value="STANDARD">Standard (Comprehensive functional + negative)</option>
+            <option value="EXHAUSTIVE">Exhaustive (All scenarios including edge cases)</option>
+          </select>
+        </div>
+
+        {/* Test Types (Multi-select) */}
+        <div>
+          <label>Test Types</label>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Functional Tests */}
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="FUNCTIONAL" />
+              <span>Functional</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="ACCEPTANCE" />
+              <span>Acceptance</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="SMOKE" />
+              <span>Smoke</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="REGRESSION" />
+              <span>Regression</span>
+            </label>
+
+            {/* Risk-Based Tests */}
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="NEGATIVE" />
+              <span>Negative</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="BOUNDARY" />
+              <span>Boundary</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="EDGE_CASE" />
+              <span>Edge Case</span>
+            </label>
+
+            {/* Technical Tests */}
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="UNIT" />
+              <span>Unit</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="INTEGRATION" />
+              <span>Integration</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="API" />
+              <span>API</span>
+            </label>
+
+            {/* Quality Tests */}
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="SECURITY" />
+              <span>Security</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="USABILITY" />
+              <span>Usability</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="ACCESSIBILITY" />
+              <span>Accessibility</span>
+            </label>
+
+            {/* Performance Tests */}
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="PERFORMANCE" />
+              <span>Performance</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="LOAD" />
+              <span>Load</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" value="STRESS" />
+              <span>Stress</span>
+            </label>
+          </div>
+          <p className="text-sm text-text-muted mt-2">
+            See proto for full list of 20 test types
+          </p>
         </div>
 
         <button
@@ -832,7 +982,184 @@ qa-platform/
 
 ---
 
-## 10. Development Roadmap
+## 10. User Interface Pages
+
+### 10.1 Landing Page (`/`)
+
+**Purpose**: Platform overview and navigation hub for all agents
+
+**Design Reference**: `/docs/frontend/styles.md` (Macy's brand theme)
+
+**Layout**:
+```tsx
+<main className="max-w-7xl mx-auto px-6 py-8">
+  {/* Hero Section */}
+  <section className="mb-12">
+    <h1 className="text-4xl font-bold text-text-primary mb-4">
+      QA Platform
+    </h1>
+    <p className="text-lg text-text-muted">
+      AI-powered test generation platform for comprehensive QA coverage
+    </p>
+  </section>
+
+  {/* Agent Cards Grid */}
+  <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {agents.map(agent => <AgentCard {...agent} />)}
+  </section>
+
+  {/* Quick Stats (real backend data) */}
+  <section className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <StatCard title="Test Cases Generated" value={stats.testCasesGenerated} />
+    <StatCard title="Agents Active" value={stats.agentsActive} />
+    <StatCard title="Coverage Score" value={stats.averageCoverage} />
+  </section>
+</main>
+```
+
+**Agent Cards**:
+```typescript
+const agents = [
+  {
+    name: 'Test Cases Agent',
+    description: 'Generate comprehensive test cases from requirements',
+    status: 'operational',  // From HealthCheck API
+    icon: '/icons/test-cases.svg',
+    link: '/test-cases',
+    features: ['User Stories', 'API Specs', 'Free Form Input']
+  },
+  {
+    name: 'Test Data Agent',
+    description: 'Generate realistic test data using AI',
+    status: 'operational',
+    icon: '/icons/test-data.svg',
+    link: 'http://localhost:3001',  // External link to existing UI
+    external: true,
+    features: ['Schema-based', 'AI Generated', 'Realistic Data']
+  },
+  {
+    name: 'eCommerce Domain Agent',
+    description: 'Domain-specific context and business rules',
+    status: 'coming_soon',  // Phase 2
+    icon: '/icons/ecommerce.svg',
+    link: '#',
+    features: ['Business Rules', 'Edge Cases', 'Domain Context']
+  }
+];
+```
+
+**Agent Status Display**:
+- Use `HealthCheck` gRPC endpoint for each agent
+- Display status badge: Operational (green), Down (red), Coming Soon (gray)
+- Show last health check timestamp
+
+**Stats Dashboard**:
+- Fetch real stats from backend (Phase 2: ListTestCases API)
+- Display:
+  - Total test cases generated (all time)
+  - Active agents count
+  - Average coverage score
+
+### 10.2 Test Cases Agent Page (`/test-cases`)
+
+**Layout Structure**:
+```tsx
+<div className="max-w-7xl mx-auto px-6 py-8">
+  {/* Page Header */}
+  <PageHeader
+    title="Test Cases Agent"
+    status={agentStatus}  // From HealthCheck
+    description="Generate comprehensive test cases from requirements"
+  />
+
+  {/* Generation Form */}
+  <section className="mb-8">
+    <GenerationForm />
+  </section>
+
+  {/* Results Section */}
+  {testCases.length > 0 && (
+    <section>
+      <ResultsHeader metadata={metadata} />
+      <TestCaseList testCases={testCases} />
+    </section>
+  )}
+</div>
+```
+
+**Components**:
+1. `GenerationForm` - All 3 input types + configuration
+2. `ResultsHeader` - Shows metadata (see Metadata Display below)
+3. `TestCaseList` - Cards with filtering/sorting
+4. `TestCaseDetail` - Modal or panel with full test case
+
+**Metadata Display** (GenerationMetadata from proto):
+```tsx
+<div className="bg-bg-secondary rounded-lg p-6 mb-6">
+  <h3 className="text-lg font-semibold mb-4">Generation Summary</h3>
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    {/* LLM Info */}
+    <div>
+      <p className="text-sm text-text-muted">Model</p>
+      <p className="font-medium">{metadata.llmProvider} / {metadata.llmModel}</p>
+    </div>
+
+    {/* Tokens */}
+    <div>
+      <p className="text-sm text-text-muted">Tokens Used</p>
+      <p className="font-medium">{metadata.llmTokensUsed.toLocaleString()}</p>
+    </div>
+
+    {/* Time */}
+    <div>
+      <p className="text-sm text-text-muted">Generation Time</p>
+      <p className="font-medium">{(metadata.generationTimeMs / 1000).toFixed(2)}s</p>
+    </div>
+
+    {/* Count */}
+    <div>
+      <p className="text-sm text-text-muted">Test Cases</p>
+      <p className="font-medium">{metadata.testCasesGenerated}</p>
+    </div>
+  </div>
+
+  {/* Coverage Breakdown (if available) */}
+  {metadata.coverage && (
+    <div className="mt-4">
+      <p className="text-sm font-medium mb-2">Coverage Analysis:</p>
+      <div className="flex gap-4 text-sm">
+        <span>Functional: {metadata.coverage.functionalCount}</span>
+        <span>Negative: {metadata.coverage.negativeCount}</span>
+        <span>Boundary: {metadata.coverage.boundaryCount}</span>
+        <span>Edge Cases: {metadata.coverage.edgeCaseCount}</span>
+      </div>
+      {metadata.coverage.uncoveredAreas?.length > 0 && (
+        <p className="text-sm text-yellow-600 mt-2">
+          Gaps: {metadata.coverage.uncoveredAreas.join(', ')}
+        </p>
+      )}
+    </div>
+  )}
+
+  {/* Domain Context (Phase 2) */}
+  {metadata.domainContextUsed && (
+    <p className="text-sm text-text-muted mt-2">
+      Domain: {metadata.domainContextUsed}
+    </p>
+  )}
+
+  {/* Duplicates */}
+  {metadata.duplicatesFound > 0 && (
+    <p className="text-sm text-yellow-600 mt-2">
+      ⚠ {metadata.duplicatesFound} duplicate(s) detected and removed
+    </p>
+  )}
+</div>
+```
+
+---
+
+## 11. Development Roadmap
 
 ### Phase 1.1: Setup (Week 1)
 - [ ] Initialize Next.js project
