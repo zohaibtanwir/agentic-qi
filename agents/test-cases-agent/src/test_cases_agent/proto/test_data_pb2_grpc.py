@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from test_cases_agent.proto import test_data_pb2 as test__data__pb2
+from . import test_data_pb2 as test__data__pb2
 
 GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__
@@ -26,8 +26,7 @@ if _version_not_supported:
 
 
 class TestDataServiceStub(object):
-    """Service exposed by Test Data Agent
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
         """Constructor.
@@ -39,6 +38,11 @@ class TestDataServiceStub(object):
                 '/testdata.v1.TestDataService/GenerateData',
                 request_serializer=test__data__pb2.GenerateRequest.SerializeToString,
                 response_deserializer=test__data__pb2.GenerateResponse.FromString,
+                _registered_method=True)
+        self.GenerateDataStream = channel.unary_stream(
+                '/testdata.v1.TestDataService/GenerateDataStream',
+                request_serializer=test__data__pb2.GenerateRequest.SerializeToString,
+                response_deserializer=test__data__pb2.DataChunk.FromString,
                 _registered_method=True)
         self.GetSchemas = channel.unary_unary(
                 '/testdata.v1.TestDataService/GetSchemas',
@@ -53,18 +57,24 @@ class TestDataServiceStub(object):
 
 
 class TestDataServiceServicer(object):
-    """Service exposed by Test Data Agent
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def GenerateData(self, request, context):
-        """Generate test data based on entity and context
+        """Synchronous generation for small requests (<1000 records)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GenerateDataStream(self, request, context):
+        """Streaming for large requests
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetSchemas(self, request, context):
-        """Get available schemas
+        """List available schemas
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -85,6 +95,11 @@ def add_TestDataServiceServicer_to_server(servicer, server):
                     request_deserializer=test__data__pb2.GenerateRequest.FromString,
                     response_serializer=test__data__pb2.GenerateResponse.SerializeToString,
             ),
+            'GenerateDataStream': grpc.unary_stream_rpc_method_handler(
+                    servicer.GenerateDataStream,
+                    request_deserializer=test__data__pb2.GenerateRequest.FromString,
+                    response_serializer=test__data__pb2.DataChunk.SerializeToString,
+            ),
             'GetSchemas': grpc.unary_unary_rpc_method_handler(
                     servicer.GetSchemas,
                     request_deserializer=test__data__pb2.GetSchemasRequest.FromString,
@@ -104,8 +119,7 @@ def add_TestDataServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class TestDataService(object):
-    """Service exposed by Test Data Agent
-    """
+    """Missing associated documentation comment in .proto file."""
 
     @staticmethod
     def GenerateData(request,
@@ -124,6 +138,33 @@ class TestDataService(object):
             '/testdata.v1.TestDataService/GenerateData',
             test__data__pb2.GenerateRequest.SerializeToString,
             test__data__pb2.GenerateResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GenerateDataStream(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/testdata.v1.TestDataService/GenerateDataStream',
+            test__data__pb2.GenerateRequest.SerializeToString,
+            test__data__pb2.DataChunk.FromString,
             options,
             channel_credentials,
             insecure,

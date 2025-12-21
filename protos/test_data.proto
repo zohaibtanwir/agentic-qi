@@ -2,86 +2,145 @@ syntax = "proto3";
 
 package testdata.v1;
 
-// Service exposed by Test Data Agent
 service TestDataService {
-  // Generate test data based on entity and context
+  // Synchronous generation for small requests (<1000 records)
   rpc GenerateData(GenerateRequest) returns (GenerateResponse);
-  
-  // Get available schemas
+
+  // Streaming for large requests
+  rpc GenerateDataStream(GenerateRequest) returns (stream DataChunk);
+
+  // List available schemas
   rpc GetSchemas(GetSchemasRequest) returns (GetSchemasResponse);
-  
+
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
-// ============ Generate Data ============
-
 message GenerateRequest {
   string request_id = 1;
-  string domain = 2;                    // ecommerce, supply_chain, etc.
-  string entity = 3;                    // customer, order, product, etc.
-  int32 count = 4;                      // Number of records to generate
-  string context = 5;                   // Natural language context for generation
-  repeated string scenarios = 6;        // Specific scenarios to generate
-  string output_format = 7;             // json, csv, sql
-  map<string, int32> scenario_counts = 8;  // Count per scenario
-  bool include_edge_cases = 9;          // Include edge case data
-  string custom_context = 10;           // Additional custom context
-  string workflow_context = 11;         // Workflow being tested
-  string llm_provider = 12;             // anthropic, openai, gemini
-  float temperature = 13;               // LLM temperature
-  int32 max_tokens = 14;                // LLM max tokens
-  string inline_schema = 15;            // Inline schema definition (JSON)
+  string domain = 2;
+  string entity = 3;
+  Schema schema = 4;
+  Constraints constraints = 5;
+  repeated Scenario scenarios = 6;
+  string context = 7;
+  repeated string hints = 8;
+  OutputFormat output_format = 9;
+  int32 count = 10;
+  bool use_cache = 11;
+  bool learn_from_history = 12;
+  bool defect_triggering = 13;
+  bool production_like = 14;
+  string inline_schema = 15;
+  GenerationMethod generation_method = 16;  // Method for generating data
+  string custom_schema = 17;  // Custom schema from domain agent
+}
+
+message Schema {
+  repeated Field fields = 1;
+  string predefined_schema = 2;
+}
+
+message Field {
+  string name = 1;
+  FieldType type = 2;
+  bool required = 3;
+  string description = 4;
+  repeated Field nested_fields = 5;
+}
+
+enum FieldType {
+  STRING = 0;
+  INTEGER = 1;
+  FLOAT = 2;
+  BOOLEAN = 3;
+  DATE = 4;
+  DATETIME = 5;
+  EMAIL = 6;
+  PHONE = 7;
+  ADDRESS = 8;
+  UUID = 9;
+  ENUM = 10;
+  OBJECT = 11;
+  ARRAY = 12;
+}
+
+message Constraints {
+  map<string, FieldConstraint> field_constraints = 1;
+}
+
+message FieldConstraint {
+  optional double min = 1;
+  optional double max = 2;
+  repeated string enum_values = 3;
+  optional string regex = 4;
+  optional int32 min_length = 5;
+  optional int32 max_length = 6;
+  optional string format = 7;
+}
+
+message Scenario {
+  string name = 1;
+  int32 count = 2;
+  map<string, string> overrides = 3;
+  string description = 4;
+}
+
+enum GenerationMethod {
+  TRADITIONAL = 0;  // Rule-based generation
+  LLM = 1;          // LLM-powered generation
+  RAG = 2;          // RAG-based generation using knowledge base
+  HYBRID = 3;       // Combination of methods
+}
+
+enum OutputFormat {
+  JSON = 0;
+  CSV = 1;
+  SQL = 2;
 }
 
 message GenerateResponse {
   string request_id = 1;
   bool success = 2;
-  string data = 3;                      // Generated data as JSON/CSV/SQL string
+  string data = 3;
   int32 record_count = 4;
   GenerationMetadata metadata = 5;
   string error = 6;
 }
 
 message GenerationMetadata {
-  string generation_path = 1;           // schema, rag, llm
+  string generation_path = 1;
   int32 llm_tokens_used = 2;
   float generation_time_ms = 3;
-  float coherence_score = 4;            // 0.0 - 1.0, how coherent the data is
-  string domain_context_used = 5;
-  map<string, int32> scenario_counts = 6;
+  float coherence_score = 4;
+  map<string, int32> scenario_counts = 5;
 }
 
-// ============ Get Schemas ============
+message DataChunk {
+  string request_id = 1;
+  string data = 2;
+  int32 chunk_index = 3;
+  bool is_final = 4;
+}
 
 message GetSchemasRequest {
-  string domain = 1;                    // Filter by domain (optional)
+  string domain = 1;
 }
 
 message GetSchemasResponse {
-  repeated Schema schemas = 1;
+  repeated SchemaInfo schemas = 1;
 }
 
-message Schema {
+message SchemaInfo {
   string name = 1;
   string domain = 2;
   string description = 3;
-  repeated SchemaField fields = 4;
+  repeated string fields = 4;
 }
-
-message SchemaField {
-  string name = 1;
-  string type = 2;
-  string description = 3;
-  bool required = 4;
-  string example = 5;
-}
-
-// ============ Health ============
 
 message HealthCheckRequest {}
 
 message HealthCheckResponse {
-  string status = 1;                    // healthy, degraded, unhealthy
+  string status = 1;
   map<string, string> components = 2;
 }
