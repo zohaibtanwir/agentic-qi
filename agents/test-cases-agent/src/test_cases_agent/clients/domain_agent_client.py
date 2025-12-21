@@ -47,7 +47,7 @@ class DomainAgentClient:
                     ("grpc.max_receive_message_length", -1),
                 ],
             )
-            self._stub = ecommerce_domain_pb2_grpc.DomainServiceStub(self._channel)
+            self._stub = ecommerce_domain_pb2_grpc.EcommerceDomainServiceStub(self._channel)
 
             # Test connection with health check
             await self.health_check()
@@ -78,7 +78,7 @@ class DomainAgentClient:
                 request,
                 timeout=5.0,
             )
-            return response.status == ecommerce_domain_pb2.HealthCheckResponse.SERVING
+            return response.status == "SERVING"
 
         except Exception as e:
             self.logger.error(f"Health check failed: {e}")
@@ -113,12 +113,9 @@ class DomainAgentClient:
             await self.connect()
 
         try:
-            request = ecommerce_domain_pb2.GetDomainContextRequest(
-                entity_type=entity_type,
+            request = ecommerce_domain_pb2.DomainContextRequest(
+                entity=entity_type,
                 scenario=scenario,
-                include_rules=include_rules,
-                include_relationships=include_relationships,
-                include_edge_cases=include_edge_cases,
             )
 
             response = await self._stub.GetDomainContext(
@@ -127,21 +124,21 @@ class DomainAgentClient:
             )
 
             return {
-                "entity_type": response.entity_type,
-                "description": response.description,
-                "business_rules": list(response.business_rules),
+                "entity_type": entity_type,  # Echo back the requested entity
+                "description": response.context,  # Map context to description
+                "business_rules": [rule.description for rule in response.rules],  # Extract rule descriptions
                 "relationships": [
                     {
-                        "entity": rel.entity,
+                        "entity": rel.target_entity,
                         "relationship_type": rel.relationship_type,
-                        "cardinality": rel.cardinality,
+                        "cardinality": "1:N",  # Default since not in proto
                         "description": rel.description,
                     }
                     for rel in response.relationships
                 ],
                 "edge_cases": list(response.edge_cases),
-                "constraints": list(response.constraints),
-                "validation_rules": list(response.validation_rules),
+                "constraints": [],  # Not in proto, return empty
+                "validation_rules": [],  # Not in proto, return empty
                 "metadata": dict(response.metadata) if response.metadata else {},
             }
 
@@ -177,8 +174,8 @@ class DomainAgentClient:
             await self.connect()
 
         try:
-            request = ecommerce_domain_pb2.GetEntityRequest(
-                entity_type=entity_type,
+            request = ecommerce_domain_pb2.EntityRequest(
+                entity_name=entity_type,
                 include_rules=include_rules,
                 include_relationships=include_relationships,
                 include_edge_cases=include_edge_cases,
@@ -190,20 +187,20 @@ class DomainAgentClient:
             )
 
             return {
-                "entity_type": response.entity.entity_type,
+                "entity_type": response.entity.name,  # Map name to entity_type
                 "description": response.entity.description,
                 "attributes": [
                     {
-                        "name": attr.name,
-                        "type": attr.type,
-                        "required": attr.required,
-                        "description": attr.description,
-                        "constraints": list(attr.constraints),
+                        "name": field.name,
+                        "type": field.type,
+                        "required": field.required,
+                        "description": field.description,
+                        "constraints": list(field.validations),  # Map validations to constraints
                     }
-                    for attr in response.entity.attributes
+                    for field in response.entity.fields  # Use fields not attributes
                 ],
-                "business_rules": list(response.entity.business_rules),
-                "relationships": list(response.entity.relationships),
+                "business_rules": [rule.description for rule in response.entity.rules],  # Extract descriptions
+                "relationships": [rel.relationship_type for rel in response.entity.relationships],  # Extract types
                 "edge_cases": list(response.entity.edge_cases),
             }
 
@@ -235,9 +232,9 @@ class DomainAgentClient:
             await self.connect()
 
         try:
-            request = ecommerce_domain_pb2.GetWorkflowRequest(
+            request = ecommerce_domain_pb2.WorkflowRequest(
                 workflow_name=workflow_name,
-                include_validations=include_validations,
+                include_steps=True,
                 include_edge_cases=include_edge_cases,
             )
 
@@ -247,22 +244,22 @@ class DomainAgentClient:
             )
 
             return {
-                "workflow_name": response.workflow.workflow_name,
+                "workflow_name": response.workflow.name,
                 "description": response.workflow.description,
                 "steps": [
                     {
-                        "step_number": step.step_number,
+                        "step_number": step.order,  # Map order to step_number
                         "name": step.name,
                         "description": step.description,
-                        "entity_type": step.entity_type,
+                        "entity_type": step.entity,  # Map entity to entity_type
                         "action": step.action,
                         "validations": list(step.validations),
-                        "next_steps": list(step.next_steps),
+                        "next_steps": list(step.possible_outcomes),  # Map possible_outcomes to next_steps
                     }
                     for step in response.workflow.steps
                 ],
-                "entities_involved": list(response.workflow.entities_involved),
-                "business_rules": list(response.workflow.business_rules),
+                "entities_involved": list(response.workflow.involved_entities),
+                "business_rules": [rule.description for rule in response.workflow.rules],  # Extract descriptions
                 "edge_cases": list(response.workflow.edge_cases),
             }
 
@@ -296,11 +293,10 @@ class DomainAgentClient:
             await self.connect()
 
         try:
-            request = ecommerce_domain_pb2.GetEdgeCasesRequest(
-                entity_type=entity_type,
-                workflow_name=workflow_name,
-                severity=severity,
-                category=category,
+            request = ecommerce_domain_pb2.EdgeCasesRequest(
+                entity=entity_type if entity_type else "",
+                workflow=workflow_name if workflow_name else "",
+                category=category if category else "",
             )
 
             response = await self._stub.GetEdgeCases(
@@ -311,14 +307,14 @@ class DomainAgentClient:
             return [
                 {
                     "id": edge_case.id,
-                    "entity_type": edge_case.entity_type,
-                    "workflow_name": edge_case.workflow_name,
+                    "entity_type": edge_case.entity,  # Map entity to entity_type
+                    "workflow_name": edge_case.workflow,  # Map workflow to workflow_name
                     "description": edge_case.description,
                     "severity": edge_case.severity,
                     "category": edge_case.category,
-                    "test_scenarios": list(edge_case.test_scenarios),
+                    "test_scenarios": [edge_case.test_approach],  # Map test_approach to list
                     "expected_behavior": edge_case.expected_behavior,
-                    "business_impact": edge_case.business_impact,
+                    "business_impact": edge_case.expected_behavior,  # Use expected_behavior as business_impact
                 }
                 for edge_case in response.edge_cases
             ]
@@ -358,11 +354,11 @@ class DomainAgentClient:
 
         try:
             request = ecommerce_domain_pb2.GenerateTestDataRequest(
-                entity_type=entity_type,
+                entity=entity_type,
                 count=count,
-                scenario=scenario,
+                workflow_context=scenario,
                 include_edge_cases=include_edge_cases,
-                format=format,
+                output_format=format,
             )
 
             response = await self._stub.GenerateTestData(

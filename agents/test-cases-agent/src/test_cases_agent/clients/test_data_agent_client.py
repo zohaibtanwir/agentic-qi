@@ -75,7 +75,7 @@ class TestDataAgentClient:
                 request,
                 timeout=5.0,
             )
-            return response.status == test_data_pb2.HealthCheckResponse.SERVING
+            return response.status == "SERVING"
 
         except Exception as e:
             self.logger.error(f"Health check failed: {e}")
@@ -126,8 +126,7 @@ class TestDataAgentClient:
             request = test_data_pb2.GenerateRequest(
                 entity=entity,
                 count=count,
-                format=format,
-                include_metadata=include_metadata,
+                output_format=format,
             )
 
             if context:
@@ -178,10 +177,8 @@ class TestDataAgentClient:
             if response.metadata:
                 result["metadata"] = {
                     "generation_path": response.metadata.generation_path,
-                    "tokens_used": response.metadata.tokens_used,
+                    "tokens_used": response.metadata.llm_tokens_used,
                     "coherence_score": response.metadata.coherence_score,
-                    "validation_passed": response.metadata.validation_passed,
-                    "warnings": list(response.metadata.warnings),
                     "generation_time_ms": response.metadata.generation_time_ms,
                 }
 
@@ -205,8 +202,8 @@ class TestDataAgentClient:
         Get available schemas from Test Data Agent.
 
         Args:
-            entity_type: Optional filter by entity type
-            include_examples: Include example data
+            entity_type: Optional filter by domain (mapped from entity_type)
+            include_examples: Include example data (ignored - not in proto)
 
         Returns:
             List of schema dictionaries
@@ -216,8 +213,7 @@ class TestDataAgentClient:
 
         try:
             request = test_data_pb2.GetSchemasRequest(
-                entity_type=entity_type,
-                include_examples=include_examples,
+                domain=entity_type if entity_type else "",
             )
 
             response = await self._stub.GetSchemas(
@@ -229,11 +225,11 @@ class TestDataAgentClient:
             for schema in response.schemas:
                 schema_dict = {
                     "name": schema.name,
-                    "entity_type": schema.entity_type,
+                    "entity_type": schema.domain,  # Map domain to entity_type for backward compat
                     "description": schema.description,
                     "fields": [],
-                    "version": schema.version,
-                    "tags": list(schema.tags),
+                    "version": "1.0",  # Default since not in proto
+                    "tags": [],  # Default since not in proto
                 }
 
                 # Parse fields
@@ -245,23 +241,10 @@ class TestDataAgentClient:
                         "description": field.description,
                     }
 
-                    if field.default_value:
-                        field_dict["default_value"] = field.default_value
-
-                    if field.constraints:
-                        field_dict["constraints"] = list(field.constraints)
-
-                    if field.enum_values:
-                        field_dict["enum_values"] = list(field.enum_values)
-
                     if field.example:
                         field_dict["example"] = field.example
 
                     schema_dict["fields"].append(field_dict)
-
-                # Add examples if present
-                if schema.examples:
-                    schema_dict["examples"] = list(schema.examples)
 
                 schemas.append(schema_dict)
 
@@ -290,35 +273,14 @@ class TestDataAgentClient:
 
         Returns:
             Validation result dictionary
+
+        Raises:
+            NotImplementedError: ValidateData RPC not yet implemented in proto
         """
-        if not self._stub:
-            await self.connect()
-
-        try:
-            request = test_data_pb2.ValidateDataRequest(
-                data=data,
-                schema_name=schema_name,
-                format=format,
-            )
-
-            response = await self._stub.ValidateData(
-                request,
-                timeout=30.0,
-            )
-
-            return {
-                "is_valid": response.is_valid,
-                "errors": list(response.errors),
-                "warnings": list(response.warnings),
-                "suggestions": list(response.suggestions),
-            }
-
-        except grpc.RpcError as e:
-            self.logger.error(f"Failed to validate data: {e.code()} - {e.details()}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error validating data: {e}")
-            raise
+        raise NotImplementedError(
+            "ValidateData RPC is not implemented in test_data.proto. "
+            "This method is planned for future implementation."
+        )
 
     async def transform_data(
         self,
@@ -338,36 +300,14 @@ class TestDataAgentClient:
 
         Returns:
             Transformed data as string
+
+        Raises:
+            NotImplementedError: TransformData RPC not yet implemented in proto
         """
-        if not self._stub:
-            await self.connect()
-
-        try:
-            request = test_data_pb2.TransformDataRequest(
-                data=data,
-                source_format=source_format,
-                target_format=target_format,
-            )
-
-            if transformation_rules:
-                for key, value in transformation_rules.items():
-                    request.transformation_rules[key] = json.dumps(value)
-
-            response = await self._stub.TransformData(
-                request,
-                timeout=30.0,
-            )
-
-            return response.transformed_data
-
-        except grpc.RpcError as e:
-            self.logger.error(
-                f"Failed to transform data: {e.code()} - {e.details()}"
-            )
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error transforming data: {e}")
-            raise
+        raise NotImplementedError(
+            "TransformData RPC is not implemented in test_data.proto. "
+            "This method is planned for future implementation."
+        )
 
     async def get_generation_history(
         self,
@@ -383,43 +323,14 @@ class TestDataAgentClient:
 
         Returns:
             List of generation history records
+
+        Raises:
+            NotImplementedError: GetGenerationHistory RPC not yet implemented in proto
         """
-        if not self._stub:
-            await self.connect()
-
-        try:
-            request = test_data_pb2.GetHistoryRequest(
-                entity_type=entity_type,
-                limit=limit,
-            )
-
-            response = await self._stub.GetGenerationHistory(
-                request,
-                timeout=30.0,
-            )
-
-            history = []
-            for record in response.history:
-                history.append({
-                    "id": record.id,
-                    "entity_type": record.entity_type,
-                    "count": record.count,
-                    "timestamp": record.timestamp,
-                    "generation_path": record.generation_path,
-                    "tokens_used": record.tokens_used,
-                    "success": record.success,
-                })
-
-            return history
-
-        except grpc.RpcError as e:
-            self.logger.error(
-                f"Failed to get generation history: {e.code()} - {e.details()}"
-            )
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error getting generation history: {e}")
-            raise
+        raise NotImplementedError(
+            "GetGenerationHistory RPC is not implemented in test_data.proto. "
+            "This method is planned for future implementation."
+        )
 
 
 # Singleton instance management

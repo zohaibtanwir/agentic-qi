@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Dict, List, Optional
 
 from test_cases_agent.config import LLMProvider as ConfigProvider, get_settings
-from test_cases_agent.llm.anthropic_client import AnthropicClient
+from test_cases_agent.llm.anthropic_simple import SimpleAnthropicClient
 from test_cases_agent.llm.base import (
     GenerationConfig,
     LLMError,
@@ -12,8 +12,6 @@ from test_cases_agent.llm.base import (
     LLMResponse,
     Message,
 )
-from test_cases_agent.llm.gemini_client import GeminiClient
-from test_cases_agent.llm.openai_client import OpenAIClient
 from test_cases_agent.utils.logging import get_logger
 
 
@@ -21,8 +19,6 @@ class LLMProviderType(str, Enum):
     """LLM provider types."""
 
     ANTHROPIC = "anthropic"
-    OPENAI = "openai"
-    GEMINI = "gemini"
 
 
 class LLMRouter:
@@ -40,47 +36,27 @@ class LLMRouter:
         self._initialized = False
 
     async def initialize(self) -> None:
-        """Initialize all configured LLM providers."""
+        """Initialize Anthropic LLM provider only."""
         if self._initialized:
             return
 
-        # Initialize Anthropic if configured
+        # Only initialize Anthropic
         if self.settings.has_anthropic:
             try:
-                client = AnthropicClient(self.settings.anthropic_api_key)
+                self.logger.info(f"Initializing Anthropic with key: {self.settings.anthropic_api_key[:10]}...")
+                client = SimpleAnthropicClient(self.settings.anthropic_api_key)
                 await client.initialize()
                 self.providers[LLMProviderType.ANTHROPIC] = client
-                self.logger.info("Anthropic provider initialized")
+                self.logger.info("Anthropic provider initialized successfully")
             except Exception as e:
                 self.logger.error(f"Failed to initialize Anthropic provider: {e}")
-
-        # Initialize OpenAI if configured
-        if self.settings.has_openai:
-            try:
-                client = OpenAIClient(self.settings.openai_api_key)
-                await client.initialize()
-                self.providers[LLMProviderType.OPENAI] = client
-                self.logger.info("OpenAI provider initialized")
-            except Exception as e:
-                self.logger.error(f"Failed to initialize OpenAI provider: {e}")
-
-        # Initialize Gemini if configured
-        if self.settings.has_gemini:
-            try:
-                client = GeminiClient(self.settings.gemini_api_key)
-                await client.initialize()
-                self.providers[LLMProviderType.GEMINI] = client
-                self.logger.info("Gemini provider initialized")
-            except Exception as e:
-                self.logger.error(f"Failed to initialize Gemini provider: {e}")
-
-        if not self.providers:
-            raise LLMError("No LLM providers configured. Please set API keys in .env")
+                raise LLMError(f"Failed to initialize Anthropic: {e}")
+        else:
+            raise LLMError("Anthropic API key not configured. Please set ANTHROPIC_API_KEY in .env")
 
         self._initialized = True
         self.logger.info(
-            f"LLM Router initialized with {len(self.providers)} provider(s): "
-            f"{', '.join([p.value for p in self.providers.keys()])}"
+            f"LLM Router initialized with Anthropic provider only"
         )
 
     async def generate(
@@ -91,65 +67,38 @@ class LLMRouter:
         fallback: bool = True,
     ) -> LLMResponse:
         """
-        Generate a response using the specified or default provider.
+        Generate a response using Anthropic Claude.
 
         Args:
             messages: List of messages in the conversation
-            provider: Specific provider to use (optional)
+            provider: Ignored - always uses Anthropic
             config: Generation configuration
-            fallback: Whether to try other providers on failure
+            fallback: Ignored - no fallback available
 
         Returns:
             LLMResponse with generated content
 
         Raises:
-            LLMError: If generation fails with all providers
+            LLMError: If generation fails
         """
         if not self._initialized:
             await self.initialize()
 
-        # Determine provider to use
-        if provider:
-            primary_provider = provider
-        else:
-            # Use default from settings
-            primary_provider = LLMProviderType(self.settings.default_llm_provider.value)
+        # Always use Anthropic
+        if LLMProviderType.ANTHROPIC not in self.providers:
+            raise LLMError("Anthropic provider not initialized")
 
-        # Get ordered list of providers to try
-        providers_to_try = self._get_provider_order(primary_provider, fallback)
+        provider_client = self.providers[LLMProviderType.ANTHROPIC]
 
-        last_error = None
-        for provider_type in providers_to_try:
-            if provider_type not in self.providers:
-                continue
+        try:
+            self.logger.info("Generating response with Anthropic Claude")
+            response = await provider_client.generate(messages, config)
+            self.logger.info("Successfully generated response with Anthropic")
+            return response
 
-            provider_client = self.providers[provider_type]
-
-            try:
-                self.logger.info(
-                    f"Attempting generation with {provider_type.value} provider"
-                )
-                response = await provider_client.generate(messages, config)
-                self.logger.info(
-                    f"Successfully generated response with {provider_type.value}"
-                )
-                return response
-
-            except Exception as e:
-                last_error = e
-                self.logger.error(
-                    f"Failed to generate with {provider_type.value}: {e}"
-                )
-
-                if not fallback:
-                    raise
-
-                continue
-
-        # All providers failed
-        raise LLMError(
-            f"All LLM providers failed. Last error: {last_error}"
-        )
+        except Exception as e:
+            self.logger.error(f"Failed to generate with Anthropic: {str(e)}")
+            raise LLMError(f"Anthropic generation failed: {str(e)}")
 
     async def generate_text(
         self,

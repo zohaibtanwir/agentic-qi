@@ -1,4 +1,4 @@
-"""Unit tests for LLM router."""
+"""Unit tests for LLM router (Anthropic-only)."""
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,17 +16,14 @@ from test_cases_agent.llm import (
 
 
 class TestLLMRouter:
-    """Test LLM Router."""
+    """Test LLM Router (Anthropic-only configuration)."""
 
     @pytest.fixture
     def mock_settings(self):
-        """Mock settings."""
+        """Mock settings for Anthropic-only."""
         settings = MagicMock()
         settings.has_anthropic = True
-        settings.has_openai = True
-        settings.has_gemini = False
         settings.anthropic_api_key = "test-anthropic-key"
-        settings.openai_api_key = "test-openai-key"
         settings.default_llm_provider = MagicMock(value="anthropic")
         return settings
 
@@ -49,52 +46,45 @@ class TestLLMRouter:
             assert router._initialized is False
 
     @pytest.mark.asyncio
-    async def test_initialize_providers(self, mock_settings):
-        """Test initializing providers."""
+    async def test_initialize_anthropic_only(self, mock_settings):
+        """Test initializing Anthropic provider only."""
         with patch("test_cases_agent.llm.router.get_settings", return_value=mock_settings):
-            with patch("test_cases_agent.llm.router.AnthropicClient") as MockAnthropic:
-                with patch("test_cases_agent.llm.router.OpenAIClient") as MockOpenAI:
-                    # Setup mocks
-                    mock_anthropic = AsyncMock()
-                    mock_openai = AsyncMock()
-                    MockAnthropic.return_value = mock_anthropic
-                    MockOpenAI.return_value = mock_openai
+            with patch("test_cases_agent.llm.router.SimpleAnthropicClient") as MockAnthropic:
+                # Setup mock
+                mock_anthropic = AsyncMock()
+                MockAnthropic.return_value = mock_anthropic
 
-                    # Initialize router
-                    router = LLMRouter()
-                    await router.initialize()
+                # Initialize router
+                router = LLMRouter()
+                await router.initialize()
 
-                    # Check providers were initialized
-                    assert router._initialized is True
-                    assert LLMProviderType.ANTHROPIC in router.providers
-                    assert LLMProviderType.OPENAI in router.providers
-                    assert LLMProviderType.GEMINI not in router.providers
+                # Check only Anthropic was initialized
+                assert router._initialized is True
+                assert LLMProviderType.ANTHROPIC in router.providers
+                assert len(router.providers) == 1
 
-                    # Check initialize was called
-                    mock_anthropic.initialize.assert_called_once()
-                    mock_openai.initialize.assert_called_once()
+                # Check initialize was called
+                mock_anthropic.initialize.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_initialize_no_providers(self):
-        """Test initialization with no providers configured."""
+    async def test_initialize_no_anthropic_configured(self):
+        """Test initialization fails when Anthropic is not configured."""
         settings = MagicMock()
         settings.has_anthropic = False
-        settings.has_openai = False
-        settings.has_gemini = False
 
         with patch("test_cases_agent.llm.router.get_settings", return_value=settings):
             router = LLMRouter()
-            with pytest.raises(LLMError, match="No LLM providers configured"):
+            with pytest.raises(LLMError, match="Anthropic API key not configured"):
                 await router.initialize()
 
     @pytest.mark.asyncio
-    async def test_generate_with_specific_provider(self, router):
-        """Test generation with specific provider."""
+    async def test_generate_with_anthropic(self, router):
+        """Test generation with Anthropic provider."""
         # Setup mock provider
         mock_provider = AsyncMock()
         mock_response = LLMResponse(
-            content="Test response",
-            model="test-model",
+            content="Test response from Claude",
+            model="claude-sonnet-4",
             provider="anthropic",
             prompt_tokens=10,
             completion_tokens=20,
@@ -106,88 +96,54 @@ class TestLLMRouter:
 
         # Generate
         messages = [Message(role=MessageRole.USER, content="Test")]
-        response = await router.generate(
-            messages,
-            provider=LLMProviderType.ANTHROPIC,
-        )
+        response = await router.generate(messages)
 
         assert response == mock_response
         mock_provider.generate.assert_called_once_with(messages, None)
 
     @pytest.mark.asyncio
-    async def test_generate_with_fallback(self, router):
-        """Test generation with fallback to another provider."""
-        # Setup mock providers
-        mock_anthropic = AsyncMock()
-        mock_openai = AsyncMock()
-
-        # Anthropic fails, OpenAI succeeds
-        mock_anthropic.generate.side_effect = Exception("Anthropic failed")
+    async def test_generate_without_initialization(self, router):
+        """Test generation initializes router if not initialized."""
+        # Setup mock provider
+        mock_provider = AsyncMock()
         mock_response = LLMResponse(
-            content="OpenAI response",
-            model="gpt-4",
-            provider="openai",
+            content="Test response",
+            model="claude-sonnet-4",
+            provider="anthropic",
             prompt_tokens=10,
             completion_tokens=20,
             total_tokens=30,
         )
-        mock_openai.generate.return_value = mock_response
+        mock_provider.generate.return_value = mock_response
 
-        router.providers[LLMProviderType.ANTHROPIC] = mock_anthropic
-        router.providers[LLMProviderType.OPENAI] = mock_openai
-        router._initialized = True
+        # Mock initialize to add the provider
+        async def mock_initialize():
+            router.providers[LLMProviderType.ANTHROPIC] = mock_provider
+            router._initialized = True
 
-        # Generate with fallback
+        router.initialize = mock_initialize
+
+        # Generate (should auto-initialize)
         messages = [Message(role=MessageRole.USER, content="Test")]
-        response = await router.generate(
-            messages,
-            provider=LLMProviderType.ANTHROPIC,
-            fallback=True,
-        )
+        response = await router.generate(messages)
 
         assert response == mock_response
-        mock_anthropic.generate.assert_called_once()
-        mock_openai.generate.assert_called_once()
+        assert router._initialized is True
 
     @pytest.mark.asyncio
-    async def test_generate_no_fallback(self, router):
-        """Test generation without fallback fails immediately."""
+    async def test_generate_anthropic_fails(self, router):
+        """Test when Anthropic generation fails (no fallback available)."""
         # Setup mock provider that fails
         mock_provider = AsyncMock()
-        mock_provider.generate.side_effect = Exception("Provider failed")
+        mock_provider.generate.side_effect = Exception("Anthropic API error")
+
         router.providers[LLMProviderType.ANTHROPIC] = mock_provider
         router._initialized = True
 
-        # Generate without fallback
+        # Generate - should raise error since no fallback
         messages = [Message(role=MessageRole.USER, content="Test")]
-        with pytest.raises(Exception, match="Provider failed"):
-            await router.generate(
-                messages,
-                provider=LLMProviderType.ANTHROPIC,
-                fallback=False,
-            )
-
-    @pytest.mark.asyncio
-    async def test_generate_all_providers_fail(self, router):
-        """Test when all providers fail."""
-        # Setup mock providers that all fail
-        mock_anthropic = AsyncMock()
-        mock_openai = AsyncMock()
-        mock_anthropic.generate.side_effect = Exception("Anthropic failed")
-        mock_openai.generate.side_effect = Exception("OpenAI failed")
-
-        router.providers[LLMProviderType.ANTHROPIC] = mock_anthropic
-        router.providers[LLMProviderType.OPENAI] = mock_openai
-        router._initialized = True
-
-        # Generate with fallback
-        messages = [Message(role=MessageRole.USER, content="Test")]
-        with pytest.raises(LLMError, match="All LLM providers failed"):
-            await router.generate(
-                messages,
-                provider=LLMProviderType.ANTHROPIC,
-                fallback=True,
-            )
+        with pytest.raises(LLMError, match="Anthropic generation failed"):
+            await router.generate(messages)
 
     @pytest.mark.asyncio
     async def test_generate_text(self, router):
@@ -196,7 +152,7 @@ class TestLLMRouter:
         mock_provider = AsyncMock()
         mock_response = LLMResponse(
             content="Test response",
-            model="test-model",
+            model="claude-sonnet-4",
             provider="anthropic",
             prompt_tokens=10,
             completion_tokens=20,
@@ -207,96 +163,84 @@ class TestLLMRouter:
         router._initialized = True
 
         # Generate text
-        response = await router.generate_text(
-            "Test prompt",
-            provider=LLMProviderType.ANTHROPIC,
-        )
+        response = await router.generate_text("Test prompt")
 
         assert response == mock_response
         # Check that it was called with a Message
         call_args = mock_provider.generate.call_args[0][0]
         assert len(call_args) == 1
-        assert call_args[0].role == MessageRole.USER
+        assert call_args[0].role == "user"
         assert call_args[0].content == "Test prompt"
 
-    def test_get_provider_order(self, router):
-        """Test getting provider order."""
+    def test_get_provider_order_anthropic_only(self, router):
+        """Test getting provider order returns only Anthropic."""
         router.providers = {
             LLMProviderType.ANTHROPIC: MagicMock(),
-            LLMProviderType.OPENAI: MagicMock(),
         }
 
-        # With fallback
+        # With fallback (no fallback available in Anthropic-only mode)
         order = router._get_provider_order(LLMProviderType.ANTHROPIC, fallback=True)
-        assert order[0] == LLMProviderType.ANTHROPIC
-        assert LLMProviderType.OPENAI in order
+        assert order == [LLMProviderType.ANTHROPIC]
 
         # Without fallback
         order = router._get_provider_order(LLMProviderType.ANTHROPIC, fallback=False)
         assert order == [LLMProviderType.ANTHROPIC]
 
-    def test_get_available_providers(self, router):
-        """Test getting available providers."""
+    def test_get_available_providers_anthropic_only(self, router):
+        """Test getting available providers returns only Anthropic."""
         router.providers = {
             LLMProviderType.ANTHROPIC: MagicMock(),
-            LLMProviderType.OPENAI: MagicMock(),
         }
 
         providers = router.get_available_providers()
-        assert LLMProviderType.ANTHROPIC in providers
-        assert LLMProviderType.OPENAI in providers
-        assert len(providers) == 2
+        assert providers == [LLMProviderType.ANTHROPIC]
+        assert len(providers) == 1
 
     def test_get_provider(self, router):
         """Test getting specific provider."""
         mock_provider = MagicMock()
         router.providers[LLMProviderType.ANTHROPIC] = mock_provider
 
+        # Get Anthropic provider
         provider = router.get_provider(LLMProviderType.ANTHROPIC)
         assert provider == mock_provider
-
-        provider = router.get_provider(LLMProviderType.GEMINI)
-        assert provider is None
 
     def test_is_provider_available(self, router):
         """Test checking provider availability."""
         router.providers[LLMProviderType.ANTHROPIC] = MagicMock()
 
+        # Anthropic should be available
         assert router.is_provider_available(LLMProviderType.ANTHROPIC) is True
-        assert router.is_provider_available(LLMProviderType.GEMINI) is False
 
-    def test_get_supported_models(self, router):
-        """Test getting supported models."""
+    def test_get_supported_models_anthropic_only(self, router):
+        """Test getting supported models for Anthropic."""
         mock_anthropic = MagicMock()
-        mock_anthropic.get_supported_models.return_value = ["claude-3", "claude-2"]
-        mock_openai = MagicMock()
-        mock_openai.get_supported_models.return_value = ["gpt-4", "gpt-3.5"]
+        mock_anthropic.get_supported_models.return_value = [
+            "claude-sonnet-4",
+            "claude-opus-4",
+            "claude-haiku-4"
+        ]
 
         router.providers[LLMProviderType.ANTHROPIC] = mock_anthropic
-        router.providers[LLMProviderType.OPENAI] = mock_openai
 
         # Get all models
         models = router.get_supported_models()
-        assert models["anthropic"] == ["claude-3", "claude-2"]
-        assert models["openai"] == ["gpt-4", "gpt-3.5"]
+        assert models == {"anthropic": ["claude-sonnet-4", "claude-opus-4", "claude-haiku-4"]}
 
         # Get specific provider models
         models = router.get_supported_models(LLMProviderType.ANTHROPIC)
-        assert models == {"anthropic": ["claude-3", "claude-2"]}
+        assert models == {"anthropic": ["claude-sonnet-4", "claude-opus-4", "claude-haiku-4"]}
 
     @pytest.mark.asyncio
     async def test_close(self, router):
         """Test closing router."""
         mock_anthropic = AsyncMock()
-        mock_openai = AsyncMock()
         router.providers[LLMProviderType.ANTHROPIC] = mock_anthropic
-        router.providers[LLMProviderType.OPENAI] = mock_openai
         router._initialized = True
 
         await router.close()
 
         mock_anthropic.close.assert_called_once()
-        mock_openai.close.assert_called_once()
         assert len(router.providers) == 0
         assert router._initialized is False
 

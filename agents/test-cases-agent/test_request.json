@@ -1,0 +1,19 @@
+{
+  "request_id": "test-001",
+  "free_form": {
+    "requirement": "Create a user login functionality with email and password validation",
+    "context": {
+      "platform": "web",
+      "framework": "React"
+    }
+  },
+  "generation_config": {
+    "output_format": "TRADITIONAL",
+    "coverage_level": "STANDARD",
+    "test_types": ["FUNCTIONAL", "NEGATIVE", "BOUNDARY"],
+    "count": 5,
+    "include_edge_cases": true,
+    "include_negative_tests": true,
+    "detail_level": "medium"
+  }
+}

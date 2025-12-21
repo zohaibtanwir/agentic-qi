@@ -51,13 +51,13 @@ class TestCasesAgent:
 
         # Set service status to SERVING
         self.health_servicer.set(
-            "test_cases.TestCasesService",
+            "testcases.v1.TestCasesService",
             health_pb2.HealthCheckResponse.SERVING,
         )
 
         # Add reflection for debugging
         service_names = [
-            "test_cases.TestCasesService",
+            "testcases.v1.TestCasesService",
             health_pb2.DESCRIPTOR.services_by_name["Health"].full_name,
             reflection.SERVICE_NAME,
         ]
@@ -122,7 +122,7 @@ class TestCasesAgent:
         if self.health_servicer:
             # Mark service as NOT_SERVING
             self.health_servicer.set(
-                "test_cases.TestCasesService",
+                "testcases.v1.TestCasesService",
                 health_pb2.HealthCheckResponse.NOT_SERVING,
             )
 

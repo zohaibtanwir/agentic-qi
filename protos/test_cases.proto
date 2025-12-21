@@ -36,9 +36,9 @@ message GenerateTestCasesRequest {
   
   // Domain enrichment (optional)
   DomainConfig domain_config = 5;
-  
+
   // Generation configuration
-  GenerationConfig config = 6;
+  GenerationConfig generation_config = 6;
   
   // Test data configuration
   TestDataConfig test_data_config = 7;
@@ -57,7 +57,14 @@ message ApiSpecInput {
 }
 
 message FreeFormInput {
-  string requirements = 1;                  // Free-form requirements text
+  string requirement = 1;                   // Free-form requirements text
+  map<string, string> context = 2;          // Additional context as key-value pairs
+}
+
+// Also define FreeFormRequirement as an alias for compatibility
+message FreeFormRequirement {
+  string requirement_text = 1;              // Free-form requirements text
+  map<string, string> context_info = 2;     // Additional context
 }
 
 message DomainConfig {
@@ -76,6 +83,10 @@ message GenerationConfig {
   bool check_duplicates = 5;                // Check against existing test cases
   int32 max_test_cases = 6;                 // Limit number of generated cases
   string priority_focus = 7;                // high, medium, low (focus on this priority)
+  int32 count = 8;                          // Number of test cases to generate
+  bool include_edge_cases = 9;              // Include edge case tests
+  bool include_negative_tests = 10;         // Include negative tests
+  string detail_level = 11;                 // low, medium, high detail level
 }
 
 message TestDataConfig {
@@ -106,6 +117,41 @@ enum TestType {
   EDGE_CASE = 4;                            // Unusual scenarios
   SECURITY = 5;                             // Security-related tests
   PERFORMANCE = 6;                          // Performance hints/scenarios
+  INTEGRATION = 7;                          // Integration between components
+  UNIT = 8;                                 // Unit level tests
+  USABILITY = 9;                            // Usability and UX tests
+  REGRESSION = 10;                          // Regression tests
+  SMOKE = 11;                               // Smoke tests
+  ACCEPTANCE = 12;                          // Acceptance tests
+  COMPATIBILITY = 13;                       // Compatibility tests
+  ACCESSIBILITY = 14;                       // Accessibility tests
+  LOCALIZATION = 15;                        // Localization tests
+  API = 16;                                 // API tests
+  DATABASE = 17;                            // Database tests
+  LOAD = 18;                                // Load tests
+  STRESS = 19;                              // Stress tests
+  RECOVERY = 20;                            // Recovery tests
+}
+
+// Priority enum for test cases
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  CRITICAL = 1;                             // Must be tested, blocks release
+  HIGH = 2;                                 // Important, should be tested
+  MEDIUM = 3;                               // Standard priority
+  LOW = 4;                                  // Nice to have
+}
+
+// Test case status enum
+enum TestCaseStatus {
+  TEST_CASE_STATUS_UNSPECIFIED = 0;
+  DRAFT = 1;                                // Test case is being created
+  READY = 2;                                // Ready for execution
+  IN_PROGRESS = 3;                          // Currently being executed
+  PASSED = 4;                               // Test passed
+  FAILED = 5;                               // Test failed
+  BLOCKED = 6;                              // Test is blocked
+  SKIPPED = 7;                              // Test was skipped
 }
 
 enum TestDataPlacement {
@@ -120,7 +166,7 @@ message GenerateTestCasesResponse {
   bool success = 2;
   repeated TestCase test_cases = 3;
   GenerationMetadata metadata = 4;
-  string error = 5;
+  string error_message = 5;
 }
 
 message TestCase {
@@ -128,10 +174,10 @@ message TestCase {
   string title = 2;
   string description = 3;
   TestType type = 4;
-  string priority = 5;                      // high, medium, low
+  Priority priority = 5;                    // Priority enum
   repeated string tags = 6;
   string requirement_id = 7;                // Traceability
-  
+
   // Preconditions
   repeated string preconditions = 8;
   
@@ -149,6 +195,9 @@ message TestCase {
   
   // Postconditions
   repeated string postconditions = 13;
+
+  // Test case status
+  TestCaseStatus status = 14;
 }
 
 message TestStep {
@@ -217,7 +266,7 @@ message TestCaseSummary {
   string id = 1;
   string title = 2;
   TestType type = 3;
-  string priority = 4;
+  Priority priority = 4;
   string domain = 5;
   string entity = 6;
   string created_at = 7;
@@ -269,9 +318,18 @@ message CoverageGap {
 
 // ============ Health ============
 
+// Health check status enum
+enum HealthCheckStatus {
+  HEALTH_CHECK_STATUS_UNSPECIFIED = 0;
+  SERVING = 1;                              // Service is healthy and serving
+  NOT_SERVING = 2;                          // Service is not serving
+  SERVICE_UNKNOWN = 3;                      // Service status unknown
+}
+
 message HealthCheckRequest {}
 
 message HealthCheckResponse {
-  string status = 1;                        // healthy, degraded, unhealthy
-  map<string, string> components = 2;
+  HealthCheckStatus status = 1;             // Service status enum
+  string version = 2;                       // Service version
+  map<string, string> components = 3;       // Component status
 }

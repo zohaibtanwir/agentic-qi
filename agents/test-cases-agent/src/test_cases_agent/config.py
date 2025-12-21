@@ -7,6 +7,12 @@ from typing import Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+# Load .env file from the root qa-platform folder
+root_env_path = Path(__file__).parent.parent.parent.parent / ".env"
+if root_env_path.exists():
+    load_dotenv(root_env_path, override=True)
 
 
 class Environment(str, Enum):

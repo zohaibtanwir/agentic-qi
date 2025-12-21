@@ -56,7 +56,7 @@ class TestDomainAgentClient:
         """Test health check."""
         client._stub = mock_stub
         mock_response = ecommerce_domain_pb2.HealthCheckResponse(
-            status=ecommerce_domain_pb2.HealthCheckResponse.SERVING
+            status="SERVING"
         )
         mock_stub.HealthCheck.return_value = mock_response
 
@@ -69,10 +69,23 @@ class TestDomainAgentClient:
     async def test_get_domain_context(self, client, mock_stub):
         """Test getting domain context."""
         client._stub = mock_stub
-        mock_response = ecommerce_domain_pb2.GetDomainContextResponse(
-            entity_type="order",
-            description="Order entity",
-            business_rules=["Rule 1", "Rule 2"],
+
+        # Create mock business rules
+        mock_rule1 = ecommerce_domain_pb2.BusinessRule(
+            id="BR001",
+            name="Rule 1",
+            description="Rule 1 description",
+        )
+        mock_rule2 = ecommerce_domain_pb2.BusinessRule(
+            id="BR002",
+            name="Rule 2",
+            description="Rule 2 description",
+        )
+
+        mock_response = ecommerce_domain_pb2.DomainContextResponse(
+            request_id="test-123",
+            context="Order entity",
+            rules=[mock_rule1, mock_rule2],
             edge_cases=["Edge case 1"],
         )
         mock_stub.GetDomainContext.return_value = mock_response
@@ -84,7 +97,8 @@ class TestDomainAgentClient:
 
         assert result["entity_type"] == "order"
         assert result["description"] == "Order entity"
-        assert "Rule 1" in result["business_rules"]
+        assert "Rule 1 description" in result["business_rules"]
+        assert "Rule 2 description" in result["business_rules"]
         assert "Edge case 1" in result["edge_cases"]
 
     @pytest.mark.asyncio
@@ -92,14 +106,21 @@ class TestDomainAgentClient:
         """Test getting entity information."""
         client._stub = mock_stub
 
-        # Create mock entity
-        mock_entity = ecommerce_domain_pb2.Entity(
-            entity_type="product",
-            description="Product entity",
-            business_rules=["Stock must be positive"],
+        # Create mock business rule
+        mock_rule = ecommerce_domain_pb2.BusinessRule(
+            id="BR001",
+            name="Stock Rule",
+            description="Stock must be positive",
         )
 
-        mock_response = ecommerce_domain_pb2.GetEntityResponse(
+        # Create mock entity
+        mock_entity = ecommerce_domain_pb2.Entity(
+            name="product",
+            description="Product entity",
+            rules=[mock_rule],
+        )
+
+        mock_response = ecommerce_domain_pb2.EntityResponse(
             entity=mock_entity
         )
         mock_stub.GetEntity.return_value = mock_response
@@ -117,12 +138,12 @@ class TestDomainAgentClient:
 
         # Create mock workflow
         mock_workflow = ecommerce_domain_pb2.Workflow(
-            workflow_name="checkout",
+            name="checkout",
             description="Checkout workflow",
-            entities_involved=["cart", "order", "payment"],
+            involved_entities=["cart", "order", "payment"],
         )
 
-        mock_response = ecommerce_domain_pb2.GetWorkflowResponse(
+        mock_response = ecommerce_domain_pb2.WorkflowResponse(
             workflow=mock_workflow
         )
         mock_stub.GetWorkflow.return_value = mock_response
@@ -141,12 +162,12 @@ class TestDomainAgentClient:
         # Create mock edge case
         mock_edge_case = ecommerce_domain_pb2.EdgeCase(
             id="EC001",
-            entity_type="order",
+            entity="order",
             description="Empty cart checkout",
             severity="HIGH",
         )
 
-        mock_response = ecommerce_domain_pb2.GetEdgeCasesResponse(
+        mock_response = ecommerce_domain_pb2.EdgeCasesResponse(
             edge_cases=[mock_edge_case]
         )
         mock_stub.GetEdgeCases.return_value = mock_response
@@ -215,7 +236,7 @@ class TestTestDataAgentClient:
 
         mock_metadata = test_data_pb2.GenerationMetadata(
             generation_path="llm",
-            tokens_used=100,
+            llm_tokens_used=100,
             coherence_score=0.95,
         )
 
@@ -253,10 +274,9 @@ class TestTestDataAgentClient:
 
         mock_schema = test_data_pb2.Schema(
             name="CustomerSchema",
-            entity_type="customer",
+            domain="customer",
             description="Customer schema",
             fields=[mock_field],
-            version="1.0",
         )
 
         mock_response = test_data_pb2.GetSchemasResponse(
@@ -275,52 +295,46 @@ class TestTestDataAgentClient:
 
     @pytest.mark.asyncio
     async def test_validate_data(self, client, mock_stub):
-        """Test validating data."""
+        """Test validating data - not yet implemented."""
         client._stub = mock_stub
 
-        mock_response = test_data_pb2.ValidateDataResponse(
-            is_valid=True,
-            errors=[],
-            warnings=["Minor warning"],
-            suggestions=["Consider adding email"],
-        )
-        mock_stub.ValidateData.return_value = mock_response
-
-        result = await client.validate_data(
-            data='{"id": 1, "name": "Test"}',
-            schema_name="CustomerSchema",
-        )
-
-        assert result["is_valid"] is True
-        assert len(result["errors"]) == 0
-        assert "Minor warning" in result["warnings"]
-        assert "Consider adding email" in result["suggestions"]
+        with pytest.raises(NotImplementedError, match="ValidateData RPC is not implemented"):
+            await client.validate_data(
+                data='{"id": 1, "name": "Test"}',
+                schema_name="CustomerSchema",
+            )
 
     @pytest.mark.asyncio
     async def test_transform_data(self, client, mock_stub):
-        """Test transforming data."""
+        """Test transforming data - not yet implemented."""
         client._stub = mock_stub
 
-        mock_response = test_data_pb2.TransformDataResponse(
-            transformed_data="id,name\n1,Test"
-        )
-        mock_stub.TransformData.return_value = mock_response
-
-        result = await client.transform_data(
-            data='{"id": 1, "name": "Test"}',
-            source_format="json",
-            target_format="csv",
-        )
-
-        assert result == "id,name\n1,Test"
+        with pytest.raises(NotImplementedError, match="TransformData RPC is not implemented"):
+            await client.transform_data(
+                data='{"id": 1, "name": "Test"}',
+                source_format="json",
+                target_format="csv",
+            )
 
     @pytest.mark.asyncio
     async def test_error_handling(self, client, mock_stub):
         """Test error handling."""
-        client._stub = mock_stub
-        mock_stub.GenerateData.side_effect = grpc.RpcError()
+        from tenacity import RetryError
 
-        with pytest.raises(grpc.RpcError):
+        client._stub = mock_stub
+
+        # Create a custom RpcError subclass for testing
+        class TestRpcError(grpc.RpcError):
+            def code(self):
+                return "INTERNAL"
+
+            def details(self):
+                return "Internal error"
+
+        mock_stub.GenerateData.side_effect = TestRpcError()
+
+        # The @retry decorator will retry 3 times then raise RetryError
+        with pytest.raises(RetryError):
             await client.generate_data("customer", 1)
 
 
