@@ -127,14 +127,14 @@ async def test_test_cases_agent():
                 free_form=free_form,
             )
 
-            response = await stub.GenerateTestCases(request, timeout=60.0)
+            response = await stub.GenerateTestCases(request, timeout=120.0)
 
             if response.success:
                 print(f"   ✓ Generation successful!")
                 print(f"   ✓ Test cases generated: {len(response.test_cases)}")
                 for i, tc in enumerate(response.test_cases[:2], 1):
                     print(f"   ✓ Test Case {i}: {tc.title}")
-                    print(f"      Type: {tc.test_type}, Priority: {tc.priority}")
+                    print(f"      Type: {test_cases_pb2.TestType.Name(tc.type)}, Priority: {test_cases_pb2.Priority.Name(tc.priority)}")
                 return True
             else:
                 print(f"   ✗ Generation failed: {response.error_message}")

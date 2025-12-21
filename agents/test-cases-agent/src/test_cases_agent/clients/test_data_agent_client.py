@@ -122,11 +122,19 @@ class TestDataAgentClient:
             await self.connect()
 
         try:
+            # Convert format string to enum
+            format_map = {
+                "json": test_data_pb2.JSON,
+                "csv": test_data_pb2.CSV,
+                "sql": test_data_pb2.SQL,
+            }
+            output_format_enum = format_map.get(format.lower(), test_data_pb2.JSON)
+
             # Build request
             request = test_data_pb2.GenerateRequest(
                 entity=entity,
                 count=count,
-                output_format=format,
+                output_format=output_format_enum,
             )
 
             if context:

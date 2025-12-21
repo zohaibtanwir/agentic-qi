@@ -79,7 +79,7 @@ class Settings(BaseSettings):
         default="localhost", description="Test Data Agent host"
     )
     test_data_agent_port: int = Field(
-        default=9001, description="Test Data Agent port"
+        default=9091, description="Test Data Agent port"
     )
 
     # Timeouts (in seconds)
