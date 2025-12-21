@@ -130,36 +130,21 @@ class TestDataAgentClient:
         try:
             await self.connect()
 
-            # Build the request
+            # Build the request - only use fields that exist in proto
             request = td_pb2.GenerateRequest(
                 request_id=request_id,
                 domain=domain,
                 entity=entity,
                 count=count,
                 context=context,
-                hints=hints,
-                output_format=self._map_output_format(output_format),
-                use_cache=use_cache,
-                production_like=production_like,
-                generation_method=self._map_generation_method(generation_method),
+                output_format=output_format,  # Use string directly, not enum
             )
 
-            # Add scenarios
-            for scenario_dict in scenarios:
-                scenario = td_pb2.Scenario(
-                    name=scenario_dict.get("name", ""),
-                    count=scenario_dict.get("count", 1),
-                    description=scenario_dict.get("description", ""),
-                )
-                # Add overrides if present
-                if "overrides" in scenario_dict:
-                    for key, value in scenario_dict["overrides"].items():
-                        scenario.overrides[key] = str(value)
-                request.scenarios.append(scenario)
+            # Add scenarios as strings (proto has repeated string scenarios field 6)
+            request.scenarios.extend([s.get("name", "") for s in scenarios])
 
-            # Add constraints if provided
-            if constraints:
-                request.constraints.CopyFrom(self._build_constraints(constraints))
+            # Note: Constraints message doesn't exist in current proto
+            # If needed, constraints can be passed via context field
 
             # Add custom schema if provided
             if custom_schema:
@@ -271,50 +256,9 @@ class TestDataAgentClient:
                 "is_final": True,
             }
 
-    def _map_generation_method(self, method_str: str) -> td_pb2.GenerationMethod:
-        """Map generation method string to proto enum."""
-        mapping = {
-            "TRADITIONAL": td_pb2.GenerationMethod.TRADITIONAL,
-            "LLM": td_pb2.GenerationMethod.LLM,
-            "RAG": td_pb2.GenerationMethod.RAG,
-            "HYBRID": td_pb2.GenerationMethod.HYBRID,
-        }
-        return mapping.get(method_str.upper(), td_pb2.GenerationMethod.HYBRID)
-
-    def _map_output_format(self, format_str: str) -> td_pb2.OutputFormat:
-        """Map string format to protobuf enum."""
-        format_map = {
-            "JSON": td_pb2.OutputFormat.JSON,
-            "CSV": td_pb2.OutputFormat.CSV,
-            "SQL": td_pb2.OutputFormat.SQL,
-        }
-        return format_map.get(format_str.upper(), td_pb2.OutputFormat.JSON)
-
-    def _build_constraints(self, constraints_dict: Dict[str, Any]) -> td_pb2.Constraints:
-        """Build protobuf Constraints from dictionary."""
-        constraints = td_pb2.Constraints()
-
-        for field_name, constraint_dict in constraints_dict.items():
-            field_constraint = td_pb2.FieldConstraint()
-
-            if "min" in constraint_dict:
-                field_constraint.min = float(constraint_dict["min"])
-            if "max" in constraint_dict:
-                field_constraint.max = float(constraint_dict["max"])
-            if "enum_values" in constraint_dict:
-                field_constraint.enum_values.extend(constraint_dict["enum_values"])
-            if "regex" in constraint_dict:
-                field_constraint.regex = constraint_dict["regex"]
-            if "min_length" in constraint_dict:
-                field_constraint.min_length = int(constraint_dict["min_length"])
-            if "max_length" in constraint_dict:
-                field_constraint.max_length = int(constraint_dict["max_length"])
-            if "format" in constraint_dict:
-                field_constraint.format = constraint_dict["format"]
-
-            constraints.field_constraints[field_name].CopyFrom(field_constraint)
-
-        return constraints
+    # Note: GenerationMethod, OutputFormat enums, and Constraints message
+    # don't exist in current test_data.proto
+    # The proto uses simple string fields for format and scenarios
 
     async def __aenter__(self):
         """Async context manager entry."""

@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from . import ecommerce_domain_pb2 as ecommerce__domain__pb2
+from test_cases_agent.proto import ecommerce_domain_pb2 as ecommerce__domain__pb2
 
 GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__

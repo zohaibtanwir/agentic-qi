@@ -29,6 +29,20 @@ class TestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EDGE_CASE: _ClassVar[TestType]
     SECURITY: _ClassVar[TestType]
     PERFORMANCE: _ClassVar[TestType]
+    INTEGRATION: _ClassVar[TestType]
+    UNIT: _ClassVar[TestType]
+    USABILITY: _ClassVar[TestType]
+    REGRESSION: _ClassVar[TestType]
+    SMOKE: _ClassVar[TestType]
+    ACCEPTANCE: _ClassVar[TestType]
+    COMPATIBILITY: _ClassVar[TestType]
+    ACCESSIBILITY: _ClassVar[TestType]
+    LOCALIZATION: _ClassVar[TestType]
+    API: _ClassVar[TestType]
+    DATABASE: _ClassVar[TestType]
+    LOAD: _ClassVar[TestType]
+    STRESS: _ClassVar[TestType]
+    RECOVERY: _ClassVar[TestType]
 
 class Priority(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -77,6 +91,20 @@ BOUNDARY: TestType
 EDGE_CASE: TestType
 SECURITY: TestType
 PERFORMANCE: TestType
+INTEGRATION: TestType
+UNIT: TestType
+USABILITY: TestType
+REGRESSION: TestType
+SMOKE: TestType
+ACCEPTANCE: TestType
+COMPATIBILITY: TestType
+ACCESSIBILITY: TestType
+LOCALIZATION: TestType
+API: TestType
+DATABASE: TestType
+LOAD: TestType
+STRESS: TestType
+RECOVERY: TestType
 PRIORITY_UNSPECIFIED: Priority
 CRITICAL: Priority
 HIGH: Priority
