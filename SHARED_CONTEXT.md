@@ -1,7 +1,7 @@
 # QA Platform - Shared Context
 
-> **Last Updated:** 2024-12-20
-> 
+> **Last Updated:** 2025-12-21
+>
 > This document tracks the current state of all agents, shared contracts, and recent decisions. Agents should read this at session start and update it when making cross-agent changes.
 
 ---
@@ -61,7 +61,7 @@
 - `GetEdgeCases` - Get edge cases for entity/workflow
 - `GenerateTestData` - Proxy to Test Data Agent with domain context
 
-### test_cases.proto (v1.0)
+### test_cases.proto (v1.1)
 
 **Location:** `/protos/test_cases.proto`
 **Server:** Test Cases Agent
@@ -70,6 +70,10 @@
 | Date | Change | Breaking |
 |------|--------|----------|
 | 2024-12-20 | Initial version | - |
+| 2025-12-21 | Added enum definitions: TestType (14 new values), Priority, TestCaseStatus, HealthCheckStatus | No |
+| 2025-12-21 | Field rename: `config` → `generation_config` in GenerateTestCasesRequest | Yes |
+| 2025-12-21 | Changed `priority` from string to Priority enum in TestCase | Yes |
+| 2025-12-21 | Changed `error` → `error_message` in GenerateTestCasesResponse | Yes |
 
 **Key RPCs:**
 - `GenerateTestCases` - Generate from user story, API spec, or free-form
@@ -77,6 +81,15 @@
 - `ListTestCases` - List with filters
 - `StoreTestCases` - Store for learning
 - `AnalyzeCoverage` - Analyze requirement coverage
+- `HealthCheck` - Service health status
+
+**Key Enums:**
+- `TestType` - 21 types including FUNCTIONAL, NEGATIVE, BOUNDARY, EDGE_CASE, SECURITY, PERFORMANCE, INTEGRATION, UNIT, REGRESSION, SMOKE, API, etc.
+- `Priority` - CRITICAL, HIGH, MEDIUM, LOW
+- `TestCaseStatus` - DRAFT, READY, IN_PROGRESS, PASSED, FAILED, BLOCKED, SKIPPED
+- `CoverageLevel` - QUICK, STANDARD, EXHAUSTIVE
+- `OutputFormat` - GHERKIN, TRADITIONAL, JSON
+- `HealthCheckStatus` - SERVING, NOT_SERVING, SERVICE_UNKNOWN
 
 ---
 
@@ -176,10 +189,45 @@ All agents support multiple LLM providers:
 
 ## Recent Decisions
 
+### 2025-12-21: CRITICAL - Upgraded all dependencies to latest stable versions
+- **Decision:** Upgraded 16+ outdated dependencies across all agents (Epic qa-platform-8lm)
+- **Rationale:** Security patches, performance improvements, EOL package replacement
+- **Critical Changes:**
+  - google-generativeai (DEPRECATED EOL Nov 30, 2025) → google-genai>=1.0.0
+  - Python 3.11 → 3.13 in all Dockerfiles (10-20% performance boost + security)
+  - gRPC 1.60.0 → 1.76.0 (16 minor versions, security patches + features)
+  - Anthropic SDK 0.18.0/0.40.0 → 0.75.0 (support for latest Claude models)
+  - OpenAI SDK 1.x → 2.14.0 (major version, breaking changes)
+  - Pydantic 2.5.0 → 2.12.0, Weaviate 4.0.0/4.4.0 → 4.18.0
+  - FastAPI 0.109.0 → 0.125.0, uvicorn 0.27.0 → 0.38.0
+  - structlog 24.x → 25.5.0, pytest 7/8 → 9.0.0
+  - Dev tools: black 24.12.0, ruff 0.8.0, mypy 1.13.0
+- **Affects:** All 3 agents
+- **Testing:** Full test suite required after upgrade
+- **Note:** google-genai code migration pending (see qa-platform-10y)
+
+### 2025-12-21: Simplified LLM to Anthropic Only (Test Cases Agent)
+- **Decision:** Test Cases Agent uses only Anthropic Claude, removed OpenAI and Gemini
+- **Rationale:** Simplify implementation, reduce dependencies, Claude performs best for test case generation
+- **Implementation:** Removed multi-provider router, direct Anthropic client usage
+- **Affects:** test-cases-agent only (other agents still support multi-LLM)
+
+### 2025-12-21: Proto Enums Standardization
+- **Decision:** Added comprehensive enum definitions to test_cases.proto
+- **Rationale:** Type safety, better API contract, prevent invalid values
+- **Implementation:** TestType (21 values), Priority, TestCaseStatus, HealthCheckStatus enums
+- **Breaking:** Yes - changed priority from string to enum
+
+### 2025-12-21: Security - .gitignore Created
+- **Decision:** Created .gitignore file for monorepo
+- **Rationale:** Critical - prevent API keys in .env from being committed to git
+- **Implementation:** Standard patterns for Python, Node, IDEs, databases, logs
+
 ### 2024-12-20: Multi-LLM Support
 - **Decision:** All agents support Anthropic (default), OpenAI, Gemini
 - **Rationale:** Flexibility for cost/performance tradeoffs
 - **Implementation:** LLM Router pattern with provider config per request
+- **Note:** Test Cases Agent simplified to Anthropic-only on 2025-12-21
 
 ### 2024-12-20: Test Data Placement in Test Cases
 - **Decision:** Support both embedded (in steps) AND separate section
