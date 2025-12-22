@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from . import test_data_pb2 as test__data__pb2
+from test_cases_agent.proto import test_data_pb2 as test__data__pb2
 
 GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__

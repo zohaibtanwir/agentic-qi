@@ -265,14 +265,15 @@ class TestTestDataAgentClient:
         """Test getting schemas."""
         client._stub = mock_stub
 
-        mock_field = test_data_pb2.SchemaField(
+        mock_field = test_data_pb2.SchemaFieldInfo(
             name="id",
             type="integer",
             required=True,
             description="Unique identifier",
+            example="123",
         )
 
-        mock_schema = test_data_pb2.Schema(
+        mock_schema = test_data_pb2.SchemaInfo(
             name="CustomerSchema",
             domain="customer",
             description="Customer schema",
