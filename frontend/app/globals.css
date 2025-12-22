@@ -1,27 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* Macy's Brand Colors */
+  --macys-red: #CE0037;
+  --macys-red-dark: #A8002C;
+  --macys-red-light: #E53E3E;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Backgrounds */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F7F7F7;
+  --bg-tertiary: #E5E5E5;
+  --bg-elevated: #FFFFFF;
+
+  /* Borders */
+  --border-default: #E5E5E5;
+  --border-light: #F0F0F0;
+
+  /* Text */
+  --text-primary: #000000;
+  --text-secondary: #333333;
+  --text-muted: #666666;
+
+  /* Accent (Interactive elements) */
+  --accent-default: #CE0037;
+  --accent-hover: #A8002C;
+  --accent-muted: rgba(206, 0, 55, 0.1);
+  --accent-foreground: #FFFFFF;
+
+  /* Status Colors */
+  --warning: #FFB000;
+  --error: #CE0037;
+  --success: #10B981;
+  --info: #0062CC;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
