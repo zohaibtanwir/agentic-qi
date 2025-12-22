@@ -40,7 +40,6 @@ export function AgentCard({
   features,
 }: AgentCardProps) {
   const config = statusConfig[status];
-  const isDisabled = status === 'coming_soon';
 
   const cardContent = (
     <div
