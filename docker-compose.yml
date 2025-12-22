@@ -1,178 +1,78 @@
-# QA Platform - Docker Compose
-# Runs all agents together
-
 version: '3.8'
 
 services:
-  # ============================================================
-  # Test Data Agent
-  # ============================================================
-  test-data-agent:
-    build: ./agents/test-data-agent/service
-    container_name: test-data-agent
-    ports:
-      - "9001:9001"  # gRPC
-      - "8081:8081"  # HTTP
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - LOG_LEVEL=INFO
-    networks:
-      - qa-platform
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  test-data-agent-ui:
-    build: ./agents/test-data-agent/ui
-    container_name: test-data-agent-ui
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
-      - GRPC_SERVICE_HOST=test-data-agent
-      - GRPC_SERVICE_PORT=9001
+      - NEXT_PUBLIC_GRPC_WEB_URL=http://localhost:8080
+      - NEXT_PUBLIC_USE_MOCK=false
+      - NEXT_PUBLIC_TEST_DATA_AGENT_URL=http://localhost:3001
     depends_on:
-      - test-data-agent
+      - envoy
     networks:
       - qa-platform
+    restart: unless-stopped
 
-  # ============================================================
-  # eCommerce Domain Agent
-  # ============================================================
-  ecommerce-domain-agent:
-    build: ./agents/ecommerce-domain-agent/service
-    container_name: ecommerce-domain-agent
+  # Envoy Proxy (gRPC-Web Gateway)
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
     ports:
-      - "9002:9002"  # gRPC
-      - "8082:8082"  # HTTP
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - WEAVIATE_URL=http://ecommerce-weaviate:8080
-      - TEST_DATA_AGENT_HOST=test-data-agent
-      - TEST_DATA_AGENT_PORT=9001
-      - LOG_LEVEL=INFO
-    depends_on:
-      ecommerce-weaviate:
-        condition: service_healthy
-      test-data-agent:
-        condition: service_healthy
-    networks:
-      - qa-platform
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  ecommerce-domain-agent-ui:
-    build: ./agents/ecommerce-domain-agent/ui
-    container_name: ecommerce-domain-agent-ui
-    ports:
-      - "3001:3000"
-    environment:
-      - GRPC_SERVICE_HOST=ecommerce-domain-agent
-      - GRPC_SERVICE_PORT=9002
-    depends_on:
-      - ecommerce-domain-agent
-    networks:
-      - qa-platform
-
-  ecommerce-weaviate:
-    image: semitechnologies/weaviate:latest
-    container_name: ecommerce-weaviate
-    ports:
-      - "8084:8080"  # Note: 8081 used by test-data-agent
-    environment:
-      - QUERY_DEFAULTS_LIMIT=25
-      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
-      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
-      - DEFAULT_VECTORIZER_MODULE=none
+      - "8080:8080"
+      - "9901:9901"
     volumes:
-      - ecommerce_weaviate_data:/var/lib/weaviate
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - qa-platform
-
-  # ============================================================
-  # Test Cases Agent
-  # ============================================================
-  test-cases-agent:
-    build: ./agents/test-cases-agent/service
-    container_name: test-cases-agent
-    ports:
-      - "9003:9003"  # gRPC
-      - "8083:8083"  # HTTP
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - WEAVIATE_URL=http://test-cases-weaviate:8080
-      - DOMAIN_AGENT_HOST=ecommerce-domain-agent
-      - DOMAIN_AGENT_PORT=9002
-      - TEST_DATA_AGENT_HOST=test-data-agent
-      - TEST_DATA_AGENT_PORT=9001
-      - LOG_LEVEL=INFO
-    depends_on:
-      test-cases-weaviate:
-        condition: service_healthy
-      ecommerce-domain-agent:
-        condition: service_healthy
-      test-data-agent:
-        condition: service_healthy
-    networks:
-      - qa-platform
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  test-cases-agent-ui:
-    build: ./agents/test-cases-agent/ui
-    container_name: test-cases-agent-ui
-    ports:
-      - "3002:3000"
-    environment:
-      - GRPC_SERVICE_HOST=test-cases-agent
-      - GRPC_SERVICE_PORT=9003
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     depends_on:
       - test-cases-agent
     networks:
       - qa-platform
+    restart: unless-stopped
 
-  test-cases-weaviate:
-    image: semitechnologies/weaviate:latest
-    container_name: test-cases-weaviate
+  # Test Cases Agent (gRPC Backend)
+  test-cases-agent:
+    build:
+      context: ./agents/test-cases-agent
+      dockerfile: Dockerfile
     ports:
-      - "8085:8080"
+      - "9003:9003"
+      - "8083:8083"
+    environment:
+      - GRPC_PORT=9003
+      - HTTP_PORT=8083
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LOG_LEVEL=INFO
+      - WEAVIATE_URL=http://weaviate:8080
+    depends_on:
+      - weaviate
+    networks:
+      - qa-platform
+    restart: unless-stopped
+
+  # Weaviate Vector Database
+  weaviate:
+    image: semitechnologies/weaviate:1.24.1
+    ports:
+      - "8084:8080"
+      - "50051:50051"
     environment:
       - QUERY_DEFAULTS_LIMIT=25
       - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
       - PERSISTENCE_DATA_PATH=/var/lib/weaviate
       - DEFAULT_VECTORIZER_MODULE=none
+      - CLUSTER_HOSTNAME=node1
     volumes:
-      - test_cases_weaviate_data:/var/lib/weaviate
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+      - weaviate-data:/var/lib/weaviate
     networks:
       - qa-platform
+    restart: unless-stopped
 
 networks:
   qa-platform:
     driver: bridge
 
 volumes:
-  ecommerce_weaviate_data:
-  test_cases_weaviate_data:
+  weaviate-data:
