@@ -323,7 +323,7 @@ class TestTestCaseResponse:
             test_cases=[],
             count=0,
             generation_time_ms=50,
-            llm_provider="openai",
+            llm_provider="anthropic",
             error="Failed to generate",
         )
 
@@ -338,7 +338,7 @@ class TestTestCaseResponse:
             test_cases=[],
             count=0,
             generation_time_ms=100,
-            llm_provider="gemini",
+            llm_provider="anthropic",
         )
 
         step = TestStep(
@@ -399,13 +399,13 @@ class TestTestCaseResponse:
             test_cases=[],
             count=0,
             generation_time_ms=100,
-            llm_provider="openai",
+            llm_provider="anthropic",
         )
 
         json_str = response.to_json()
         assert isinstance(json_str, str)
         assert '"success": true' in json_str
-        assert '"llm_provider": "openai"' in json_str
+        assert '"llm_provider": "anthropic"' in json_str
 
 
 class TestEnums:

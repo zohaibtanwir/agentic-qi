@@ -55,15 +55,8 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
             # Build TestCaseRequest from proto
             tc_request = self._build_test_case_request(request)
 
-            # Determine LLM provider
-            llm_provider = None
-            if request.generation_config and request.generation_config.llm_provider:
-                provider_map = {
-                    "anthropic": LLMProviderType.ANTHROPIC,
-                    "openai": LLMProviderType.OPENAI,
-                    "gemini": LLMProviderType.GEMINI,
-                }
-                llm_provider = provider_map.get(request.generation_config.llm_provider.lower())
+            # Always use Anthropic (only supported provider)
+            llm_provider = LLMProviderType.ANTHROPIC
 
             # Generate test cases
             generation_response = await self.generation_engine.generate(tc_request, llm_provider)

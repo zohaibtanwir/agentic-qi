@@ -38,8 +38,6 @@ class LLMProvider(str, Enum):
     """LLM provider enum."""
 
     ANTHROPIC = "anthropic"
-    OPENAI = "openai"
-    GEMINI = "gemini"
 
 
 class Settings(BaseSettings):
@@ -54,13 +52,8 @@ class Settings(BaseSettings):
     http_port: int = Field(default=8083, description="HTTP health check port")
     log_level: LogLevel = Field(default=LogLevel.INFO, description="Log level")
 
-    # LLM Configuration
+    # LLM Configuration (Anthropic only)
     anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
-    gemini_api_key: Optional[str] = Field(default=None, description="Google Gemini API key")
-    default_llm_provider: LLMProvider = Field(
-        default=LLMProvider.ANTHROPIC, description="Default LLM provider"
-    )
 
     # Weaviate Configuration
     weaviate_url: str = Field(
@@ -103,7 +96,7 @@ class Settings(BaseSettings):
         description="Project root directory",
     )
 
-    @field_validator("anthropic_api_key", "openai_api_key", "gemini_api_key", mode="before")
+    @field_validator("anthropic_api_key", mode="before")
     def validate_api_keys(cls, v: Optional[str]) -> Optional[str]:
         """Validate API keys."""
         if v and v.startswith("your_") and v.endswith("_here"):
@@ -124,27 +117,6 @@ class Settings(BaseSettings):
     def has_anthropic(self) -> bool:
         """Check if Anthropic is configured."""
         return bool(self.anthropic_api_key)
-
-    @property
-    def has_openai(self) -> bool:
-        """Check if OpenAI is configured."""
-        return bool(self.openai_api_key)
-
-    @property
-    def has_gemini(self) -> bool:
-        """Check if Gemini is configured."""
-        return bool(self.gemini_api_key)
-
-    def get_available_providers(self) -> list[LLMProvider]:
-        """Get list of available LLM providers."""
-        providers = []
-        if self.has_anthropic:
-            providers.append(LLMProvider.ANTHROPIC)
-        if self.has_openai:
-            providers.append(LLMProvider.OPENAI)
-        if self.has_gemini:
-            providers.append(LLMProvider.GEMINI)
-        return providers
 
     class Config:
         """Pydantic config."""

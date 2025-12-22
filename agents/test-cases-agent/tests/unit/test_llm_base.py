@@ -81,8 +81,8 @@ class TestLLMResponse:
         """Test creating an LLM response."""
         response = LLMResponse(
             content="Generated text",
-            model="gpt-4",
-            provider="openai",
+            model="claude-3-sonnet-20240229",
+            provider="anthropic",
             prompt_tokens=100,
             completion_tokens=50,
             total_tokens=150,
@@ -91,8 +91,8 @@ class TestLLMResponse:
         )
 
         assert response.content == "Generated text"
-        assert response.model == "gpt-4"
-        assert response.provider == "openai"
+        assert response.model == "claude-3-sonnet-20240229"
+        assert response.provider == "anthropic"
         assert response.prompt_tokens == 100
         assert response.completion_tokens == 50
         assert response.total_tokens == 150
@@ -251,12 +251,12 @@ class TestLLMErrors:
 
         error = LLMAPIError(
             "API failed",
-            provider="openai",
+            provider="anthropic",
             status_code=500,
             response="Internal error",
         )
         assert str(error) == "API failed"
-        assert error.provider == "openai"
+        assert error.provider == "anthropic"
         assert error.status_code == 500
         assert error.response == "Internal error"
 
@@ -279,9 +279,9 @@ class TestLLMErrors:
 
         error = LLMAuthenticationError(
             "Invalid API key",
-            provider="gemini",
+            provider="anthropic",
             status_code=401,
         )
         assert str(error) == "Invalid API key"
-        assert error.provider == "gemini"
+        assert error.provider == "anthropic"
         assert error.status_code == 401
