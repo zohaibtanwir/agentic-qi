@@ -8,9 +8,11 @@ export function Header() {
       <div className="flex items-center justify-between h-full px-6 max-w-7xl mx-auto">
         {/* Logo and title */}
         <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
-          <div className="w-10 h-10 bg-[var(--accent-default)] rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">QA</span>
-          </div>
+          <img
+            src="https://assets.macysassets.com/app/navigation-wgl/static/images/logo.svg"
+            alt="Macy's Logo"
+            className="h-8"
+          />
           <span className="text-lg font-semibold text-[var(--text-secondary)]">
             QA Platform
           </span>

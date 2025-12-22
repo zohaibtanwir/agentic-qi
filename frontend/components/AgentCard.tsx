@@ -44,9 +44,7 @@ export function AgentCard({
 
   const cardContent = (
     <div
-      className={`bg-white rounded-lg border border-[var(--border-default)] p-6 shadow-sm transition-all duration-200 ${
-        !isDisabled ? 'hover:shadow-md hover:border-[var(--accent-default)]' : 'opacity-60 cursor-not-allowed'
-      }`}
+      className="bg-white rounded-lg border border-[var(--border-default)] p-6 shadow-sm transition-all duration-200 h-full flex flex-col hover:shadow-md hover:border-[var(--accent-default)]"
     >
       {/* Header with status badge */}
       <div className="flex items-start justify-between mb-4">
@@ -67,12 +65,12 @@ export function AgentCard({
       </div>
 
       {/* Features List */}
-      <div className="mb-4">
+      <div className="mb-4 flex-1">
         <ul className="space-y-2">
           {features.map((feature, index) => (
             <li key={index} className="flex items-center text-sm text-[var(--text-secondary)]">
               <svg
-                className="w-4 h-4 mr-2 text-[var(--accent-default)]"
+                className="w-4 h-4 mr-2 text-[var(--accent-default)] flex-shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -89,32 +87,26 @@ export function AgentCard({
       </div>
 
       {/* Action Button */}
-      {!isDisabled && (
-        <div className="pt-4 border-t border-[var(--border-light)]">
-          <div className="flex items-center justify-between text-[var(--accent-default)] font-medium text-sm">
-            <span>Open Agent</span>
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d={external ? "M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" : "M9 5l7 7-7 7"}
-              />
-            </svg>
-          </div>
+      <div className="pt-4 border-t border-[var(--border-light)]">
+        <div className="flex items-center justify-between text-[var(--accent-default)] font-medium text-sm">
+          <span>Open Agent</span>
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d={external ? "M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" : "M9 5l7 7-7 7"}
+            />
+          </svg>
         </div>
-      )}
+      </div>
     </div>
   );
-
-  if (isDisabled || link === '#') {
-    return <div>{cardContent}</div>;
-  }
 
   if (external) {
     return (
@@ -122,12 +114,12 @@ export function AgentCard({
         href={link}
         target="_blank"
         rel="noopener noreferrer"
-        className="block"
+        className="block h-full"
       >
         {cardContent}
       </a>
     );
   }
 
-  return <Link href={link}>{cardContent}</Link>;
+  return <Link href={link} className="block h-full">{cardContent}</Link>;
 }
