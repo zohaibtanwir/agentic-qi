@@ -25,6 +25,23 @@ export interface GeneratorFormState {
   defectTriggering: boolean;
 }
 
+export interface HistoryEntry {
+  id: string;
+  timestamp: number;
+  label: string;
+  domain: string;
+  entity: string;
+  count: number;
+  recordCount: number;
+  outputFormat: OutputFormat;
+  generationMethod: GenerationMethod;
+  coherenceScore: number;
+  generationTimeMs: number;
+  data: string;
+  scenarios: ScenarioItem[];
+  context: string;
+}
+
 export interface ScenarioItem extends Scenario {
   id: string;
 }
@@ -64,8 +81,8 @@ export interface TestDataState {
   // Errors
   error: string | null;
 
-  // History for undo
-  history: string[];
+  // History entries with full metadata
+  historyEntries: HistoryEntry[];
 }
 
 export interface TestDataActions {
@@ -91,6 +108,11 @@ export interface TestDataActions {
 
   // Error actions
   clearError: () => void;
+
+  // History actions
+  loadHistoryEntry: (id: string) => void;
+  deleteHistoryEntry: (id: string) => void;
+  clearHistory: () => void;
 }
 
 export type TestDataStore = TestDataState & TestDataActions;
@@ -130,7 +152,7 @@ const initialState: TestDataState = {
   isGenerating: false,
   isLoadingSchemas: false,
   error: null,
-  history: [],
+  historyEntries: [],
 };
 
 // ============= Store =============
@@ -274,15 +296,31 @@ export const useTestDataStore = create<TestDataStore>()(
                 llmTokensUsed: state.generationStats.llmTokensUsed + (response.metadata?.llmTokensUsed || 0),
               };
 
+              // Create history entry with full metadata
+              const historyEntry: HistoryEntry = {
+                id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                timestamp: Date.now(),
+                label: `${state.form.entity} (${response.recordCount} records)`,
+                domain: state.form.domain,
+                entity: state.form.entity,
+                count: state.form.count,
+                recordCount: response.recordCount,
+                outputFormat: state.form.outputFormat,
+                generationMethod: state.form.generationMethod,
+                coherenceScore: response.metadata?.coherenceScore || 0,
+                generationTimeMs: response.metadata?.generationTimeMs || 0,
+                data: response.data,
+                scenarios: [...state.scenarios],
+                context: state.form.context,
+              };
+
               set(
                 {
                   generatedData: response.data,
                   lastResponse: response,
                   generationStats: newStats,
                   isGenerating: false,
-                  history: state.generatedData
-                    ? [...state.history.slice(-9), state.generatedData]
-                    : state.history,
+                  historyEntries: [historyEntry, ...state.historyEntries.slice(0, 19)], // Keep last 20 entries
                 },
                 false,
                 'generateData:success'
@@ -321,6 +359,59 @@ export const useTestDataStore = create<TestDataStore>()(
         clearError: () => {
           set({ error: null }, false, 'clearError');
         },
+
+        // History actions
+        loadHistoryEntry: (id) => {
+          const state = get();
+          const entry = state.historyEntries.find((e) => e.id === id);
+          if (entry) {
+            set(
+              {
+                form: {
+                  ...state.form,
+                  domain: entry.domain,
+                  entity: entry.entity,
+                  count: entry.count,
+                  outputFormat: entry.outputFormat,
+                  generationMethod: entry.generationMethod,
+                  context: entry.context,
+                },
+                scenarios: entry.scenarios,
+                generatedData: entry.data,
+                lastResponse: {
+                  requestId: entry.id,
+                  success: true,
+                  data: entry.data,
+                  recordCount: entry.recordCount,
+                  metadata: {
+                    generationPath: entry.generationMethod === 0 ? 'traditional' : 'llm',
+                    generationTimeMs: entry.generationTimeMs,
+                    coherenceScore: entry.coherenceScore,
+                    llmTokensUsed: 0,
+                    scenarioCounts: {},
+                  },
+                  error: '',
+                },
+              },
+              false,
+              'loadHistoryEntry'
+            );
+          }
+        },
+
+        deleteHistoryEntry: (id) => {
+          set(
+            (state) => ({
+              historyEntries: state.historyEntries.filter((e) => e.id !== id),
+            }),
+            false,
+            'deleteHistoryEntry'
+          );
+        },
+
+        clearHistory: () => {
+          set({ historyEntries: [] }, false, 'clearHistory');
+        },
       }),
       {
         name: 'test-data-store',
@@ -328,6 +419,7 @@ export const useTestDataStore = create<TestDataStore>()(
           form: state.form,
           sidebarCollapsed: state.sidebarCollapsed,
           generationStats: state.generationStats,
+          historyEntries: state.historyEntries,
         }),
       }
     ),
@@ -344,6 +436,7 @@ export const selectGeneratedData = (state: TestDataStore) => state.generatedData
 export const selectIsGenerating = (state: TestDataStore) => state.isGenerating;
 export const selectError = (state: TestDataStore) => state.error;
 export const selectStats = (state: TestDataStore) => state.generationStats;
+export const selectHistoryEntries = (state: TestDataStore) => state.historyEntries;
 
 export const selectEntitySchema = (state: TestDataStore) => {
   const { entity } = state.form;

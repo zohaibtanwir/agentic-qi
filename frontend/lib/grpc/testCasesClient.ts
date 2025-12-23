@@ -1,16 +1,146 @@
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import {
   TestType,
   Priority,
   OutputFormat,
   TestCaseStatus,
+  GenerateTestCasesRequest as GenerateTestCasesRequestMsg,
+  GenerateTestCasesResponse as GenerateTestCasesResponseMsg,
+  HealthCheckRequest as HealthCheckRequestMsg,
+  HealthCheckResponse as HealthCheckResponseMsg,
   type GenerateTestCasesRequest,
   type GenerateTestCasesResponse,
   type HealthCheckResponse,
   type TestCase,
 } from './generated/test_cases';
 
-const GRPC_WEB_URL = process.env.NEXT_PUBLIC_GRPC_WEB_URL || 'http://localhost:8080';
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true' || true; // Default to mock for development
+const GRPC_WEB_URL = process.env.NEXT_PUBLIC_GRPC_WEB_URL || 'http://localhost:8085';
+// Default to real backend; only use mock if explicitly set to 'true'
+// Use a function to check at runtime so tests can set the env variable after import
+function isMockMode(): boolean {
+  return process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+}
+
+/**
+ * Encode a protobuf message with gRPC-Web framing
+ * Frame format: 1 byte compression flag + 4 bytes length (big-endian) + message bytes
+ */
+function encodeGrpcWebRequest(messageBytes: Uint8Array): Uint8Array {
+  const frame = new Uint8Array(5 + messageBytes.length);
+  // Compression flag (0 = no compression)
+  frame[0] = 0;
+  // Message length (big-endian)
+  const length = messageBytes.length;
+  frame[1] = (length >> 24) & 0xff;
+  frame[2] = (length >> 16) & 0xff;
+  frame[3] = (length >> 8) & 0xff;
+  frame[4] = length & 0xff;
+  // Message bytes
+  frame.set(messageBytes, 5);
+  return frame;
+}
+
+/**
+ * Decode a gRPC-Web response
+ * Returns the message bytes and any trailers
+ */
+function decodeGrpcWebResponse(data: Uint8Array): { messageBytes: Uint8Array; trailers: Map<string, string> } {
+  const trailers = new Map<string, string>();
+  let messageBytes = new Uint8Array(0);
+  let offset = 0;
+
+  while (offset < data.length) {
+    if (offset + 5 > data.length) break;
+
+    const compressionFlag = data[offset];
+    const length =
+      (data[offset + 1] << 24) |
+      (data[offset + 2] << 16) |
+      (data[offset + 3] << 8) |
+      data[offset + 4];
+
+    offset += 5;
+
+    if (offset + length > data.length) break;
+
+    const frameData = data.slice(offset, offset + length);
+    offset += length;
+
+    // Check if this is a trailer frame (compression flag has bit 7 set)
+    if (compressionFlag & 0x80) {
+      // Parse trailers
+      const trailerStr = new TextDecoder().decode(frameData);
+      trailerStr.split('\r\n').forEach((line) => {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx > 0) {
+          const key = line.slice(0, colonIdx).trim().toLowerCase();
+          const value = line.slice(colonIdx + 1).trim();
+          trailers.set(key, value);
+        }
+      });
+    } else {
+      // This is the message
+      messageBytes = frameData;
+    }
+  }
+
+  return { messageBytes, trailers };
+}
+
+/**
+ * Make a gRPC-Web unary call
+ */
+async function grpcWebUnaryCall<TRequest, TResponse>(
+  url: string,
+  method: string,
+  request: TRequest,
+  encode: (message: TRequest, writer?: BinaryWriter) => BinaryWriter,
+  decode: (input: BinaryReader | Uint8Array, length?: number) => TResponse
+): Promise<TResponse> {
+  // Encode the request
+  const writer = new BinaryWriter();
+  encode(request, writer);
+  const messageBytes = writer.finish();
+  const framedRequest = encodeGrpcWebRequest(messageBytes);
+
+  // Convert to ArrayBuffer for fetch body (ensures type compatibility)
+  const bodyBuffer = new ArrayBuffer(framedRequest.length);
+  const bodyView = new Uint8Array(bodyBuffer);
+  bodyView.set(framedRequest);
+
+  // Make the HTTP request
+  const response = await fetch(`${url}/${method}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/grpc-web+proto',
+      'X-Grpc-Web': '1',
+      'Accept': 'application/grpc-web+proto',
+    },
+    body: bodyBuffer,
+  });
+
+  if (!response.ok) {
+    throw new Error(`gRPC HTTP error: ${response.status} ${response.statusText}`);
+  }
+
+  // Read the response
+  const responseData = new Uint8Array(await response.arrayBuffer());
+  const { messageBytes: respBytes, trailers } = decodeGrpcWebResponse(responseData);
+
+  // Check for gRPC status in trailers
+  const grpcStatus = trailers.get('grpc-status');
+  if (grpcStatus && grpcStatus !== '0') {
+    const grpcMessage = trailers.get('grpc-message') || 'Unknown gRPC error';
+    throw new Error(`gRPC error (${grpcStatus}): ${decodeURIComponent(grpcMessage)}`);
+  }
+
+  // Decode the response
+  if (respBytes.length === 0) {
+    throw new Error('Empty response from server');
+  }
+
+  return decode(respBytes);
+}
 
 // Mock data generator for development
 function generateMockTestCases(request: GenerateTestCasesRequest): TestCase[] {
@@ -142,7 +272,7 @@ function getTestTypeDescription(type: TestType): string {
 
 export const testCasesClient = {
   async generateTestCases(request: GenerateTestCasesRequest): Promise<GenerateTestCasesResponse> {
-    if (USE_MOCK) {
+    if (isMockMode()) {
       // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -172,25 +302,18 @@ export const testCasesClient = {
       };
     }
 
-    // Real gRPC-Web call (when Envoy is configured)
-    const response = await fetch(`${GRPC_WEB_URL}/testcases.v1.TestCasesService/GenerateTestCases`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/grpc-web+proto',
-        'X-Grpc-Web': '1',
-      },
-      body: JSON.stringify(request), // Note: Real gRPC-Web uses binary encoding
-    });
-
-    if (!response.ok) {
-      throw new Error(`gRPC error: ${response.status}`);
-    }
-
-    return response.json();
+    // Real gRPC-Web call using proper protobuf encoding
+    return grpcWebUnaryCall<GenerateTestCasesRequest, GenerateTestCasesResponse>(
+      GRPC_WEB_URL,
+      'testcases.v1.TestCasesService/GenerateTestCases',
+      request,
+      GenerateTestCasesRequestMsg.encode,
+      GenerateTestCasesResponseMsg.decode
+    );
   },
 
   async healthCheck(): Promise<HealthCheckResponse> {
-    if (USE_MOCK) {
+    if (isMockMode()) {
       return {
         status: 1, // SERVING
         version: '1.0.0',
@@ -201,15 +324,14 @@ export const testCasesClient = {
       };
     }
 
-    const response = await fetch(`${GRPC_WEB_URL}/testcases.v1.TestCasesService/HealthCheck`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/grpc-web+proto',
-        'X-Grpc-Web': '1',
-      },
-    });
-
-    return response.json();
+    // Real gRPC-Web call using proper protobuf encoding
+    return grpcWebUnaryCall<Record<string, never>, HealthCheckResponse>(
+      GRPC_WEB_URL,
+      'testcases.v1.TestCasesService/HealthCheck',
+      {},
+      HealthCheckRequestMsg.encode,
+      HealthCheckResponseMsg.decode
+    );
   },
 };
 

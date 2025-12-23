@@ -1,7 +1,12 @@
 version: '3.8'
 
+# ============================================================================
+# QA Platform Services - FROZEN PORT CONFIGURATION
+# DO NOT CHANGE THESE PORTS - See SERVICES.md for documentation
+# ============================================================================
+
 services:
-  # Frontend (Next.js)
+  # Frontend (Next.js) - Port 3000
   frontend:
     build:
       context: ./frontend
@@ -9,7 +14,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_GRPC_WEB_URL=http://localhost:8080
+      - NEXT_PUBLIC_GRPC_WEB_URL=http://localhost:8085
       - NEXT_PUBLIC_USE_MOCK=false
       - NEXT_PUBLIC_TEST_DATA_AGENT_URL=http://localhost:3001
     depends_on:
@@ -18,21 +23,23 @@ services:
       - qa-platform
     restart: unless-stopped
 
-  # Envoy Proxy (gRPC-Web Gateway)
+  # Envoy Proxy (gRPC-Web Gateway) - Port 8085, Admin 9901
   envoy:
     image: envoyproxy/envoy:v1.31-latest
+    container_name: qa-envoy
     ports:
-      - "8080:8080"
+      - "8085:8085"
       - "9901:9901"
     volumes:
       - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     depends_on:
       - test-cases-agent
+      - test-data-agent
     networks:
       - qa-platform
     restart: unless-stopped
 
-  # Test Cases Agent (gRPC Backend)
+  # Test Cases Agent (gRPC Backend) - gRPC 9003, HTTP 8083
   test-cases-agent:
     build:
       context: ./agents/test-cases-agent
@@ -52,11 +59,52 @@ services:
       - qa-platform
     restart: unless-stopped
 
-  # Weaviate Vector Database
+  # Test Data Agent (gRPC Backend) - gRPC 9091, HTTP 8091
+  test-data-agent:
+    build:
+      context: ./agents/test-data-agent
+      dockerfile: Dockerfile
+    container_name: test-data-agent
+    ports:
+      - "9091:9091"
+      - "8091:8091"
+    environment:
+      - SERVICE_NAME=test-data-agent
+      - GRPC_PORT=9091
+      - HTTP_PORT=8091
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=development
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - WEAVIATE_URL=http://weaviate:8080
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - weaviate
+    networks:
+      - qa-platform
+    restart: unless-stopped
+
+  # Redis Cache - Port 6379
+  redis:
+    image: redis:7-alpine
+    container_name: qa-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - qa-platform
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Weaviate Vector Database - HTTP 8080, gRPC 50051
   weaviate:
     image: semitechnologies/weaviate:1.24.1
+    container_name: qa-weaviate
     ports:
-      - "8084:8080"
+      - "8080:8080"
       - "50051:50051"
     environment:
       - QUERY_DEFAULTS_LIMIT=25

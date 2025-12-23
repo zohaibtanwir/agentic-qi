@@ -194,7 +194,7 @@ export function DataPreview() {
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="text-3xl font-bold text-[var(--text-primary)]">
-                      {lastResponse.metadata.generationTimeMs}ms
+                      {(lastResponse.metadata.generationTimeMs / 1000).toFixed(2)}s
                     </div>
                     <div className="text-sm text-[var(--text-muted)] mt-1">
                       Generation Time

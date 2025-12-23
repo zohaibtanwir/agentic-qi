@@ -17,7 +17,11 @@ import {
 } from './generated/test_data';
 
 const GRPC_WEB_URL = process.env.NEXT_PUBLIC_GRPC_WEB_URL || 'http://localhost:8085';
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false';
+// Default to real backend; only use mock if explicitly set to 'true'
+// Use a function to check at runtime so tests can set the env variable after import
+function isMockMode(): boolean {
+  return process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+}
 
 /**
  * Encode a protobuf message with gRPC-Web framing
@@ -76,8 +80,32 @@ function decodeGrpcWebResponse(data: Uint8Array): { messageBytes: Uint8Array; tr
   return { messageBytes, trailers };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _base64ToBytes(base64: string): Uint8Array {
+  let padded = base64;
+  while (padded.length % 4 !== 0) {
+    padded += '=';
+  }
+  padded = padded.replace(/-/g, '+').replace(/_/g, '/');
+  const binaryString = atob(padded);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 /**
- * Make a gRPC-Web unary call
+ * Make a gRPC-Web unary call (binary mode)
  */
 async function grpcWebUnaryCall<TRequest, TResponse>(
   url: string,
@@ -91,10 +119,6 @@ async function grpcWebUnaryCall<TRequest, TResponse>(
   const messageBytes = writer.finish();
   const framedRequest = encodeGrpcWebRequest(messageBytes);
 
-  const bodyBuffer = new ArrayBuffer(framedRequest.length);
-  const bodyView = new Uint8Array(bodyBuffer);
-  bodyView.set(framedRequest);
-
   const response = await fetch(`${url}/${method}`, {
     method: 'POST',
     headers: {
@@ -102,7 +126,7 @@ async function grpcWebUnaryCall<TRequest, TResponse>(
       'X-Grpc-Web': '1',
       'Accept': 'application/grpc-web+proto',
     },
-    body: bodyBuffer,
+    body: framedRequest as unknown as BodyInit,
   });
 
   if (!response.ok) {
@@ -110,6 +134,11 @@ async function grpcWebUnaryCall<TRequest, TResponse>(
   }
 
   const responseData = new Uint8Array(await response.arrayBuffer());
+
+  if (responseData.length === 0) {
+    throw new Error('Empty response from gRPC server');
+  }
+
   const { messageBytes: respBytes, trailers } = decodeGrpcWebResponse(responseData);
 
   const grpcStatus = trailers.get('grpc-status');
@@ -119,7 +148,7 @@ async function grpcWebUnaryCall<TRequest, TResponse>(
   }
 
   if (respBytes.length === 0) {
-    throw new Error('Empty response from server');
+    throw new Error('No message data in response');
   }
 
   return decode(respBytes);
@@ -313,7 +342,7 @@ function generateMockData(request: GenerateRequest): object[] {
 
 export const testDataClient = {
   async generateData(request: GenerateRequest): Promise<GenerateResponse> {
-    if (USE_MOCK) {
+    if (isMockMode()) {
       // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
 
@@ -351,7 +380,7 @@ export const testDataClient = {
   },
 
   async getSchemas(domain?: string): Promise<GetSchemasResponse> {
-    if (USE_MOCK) {
+    if (isMockMode()) {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const schemas = domain
@@ -371,7 +400,7 @@ export const testDataClient = {
   },
 
   async healthCheck(): Promise<HealthCheckResponse> {
-    if (USE_MOCK) {
+    if (isMockMode()) {
       return {
         status: 'healthy',
         components: {
