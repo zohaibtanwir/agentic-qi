@@ -4,7 +4,7 @@ static_resources:
       address:
         socket_address:
           address: 0.0.0.0
-          port_value: 8080
+          port_value: 8085
       filter_chains:
         - filters:
             - name: envoy.filters.network.http_connection_manager
@@ -22,6 +22,13 @@ static_resources:
                             prefix: "/testcases.v1.TestCasesService"
                           route:
                             cluster: test_cases_service
+                            timeout: 0s
+                            max_stream_duration:
+                              grpc_timeout_header_max: 120s
+                        - match:
+                            prefix: "/testdata.v1.TestDataService"
+                          route:
+                            cluster: test_data_service
                             timeout: 0s
                             max_stream_duration:
                               grpc_timeout_header_max: 120s
@@ -46,6 +53,7 @@ static_resources:
     - name: test_cases_service
       connect_timeout: 0.25s
       type: logical_dns
+      dns_lookup_family: V4_ONLY
       http2_protocol_options: {}
       lb_policy: round_robin
       load_assignment:
@@ -55,8 +63,23 @@ static_resources:
               - endpoint:
                   address:
                     socket_address:
-                      address: test-cases-agent
+                      address: host.docker.internal
                       port_value: 9003
+    - name: test_data_service
+      connect_timeout: 0.25s
+      type: logical_dns
+      dns_lookup_family: V4_ONLY
+      http2_protocol_options: {}
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: test_data_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal
+                      port_value: 9091
 
 admin:
   address:
