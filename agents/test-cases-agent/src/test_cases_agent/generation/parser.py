@@ -40,11 +40,13 @@ class TestCaseParser:
             # Clean response
             response = self._clean_response(response)
 
-            # Try to detect format if not provided
-            if not format_hint:
+            # Try to detect format if not provided or not recognized
+            recognized_formats = {"json", "yaml", "markdown", "text"}
+            if not format_hint or format_hint not in recognized_formats:
+                self.logger.info(f"Format hint '{format_hint}' not recognized, auto-detecting...")
                 format_hint = self._detect_format(response)
 
-            self.logger.debug(f"Parsing response with format: {format_hint}")
+            self.logger.info(f"Parsing response with format: {format_hint}")
 
             # Parse based on format
             if format_hint == "json":
@@ -71,21 +73,23 @@ class TestCaseParser:
         Returns:
             Cleaned response
         """
-        # Remove code blocks if present
-        if "```json" in response:
-            match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
+        # Remove code blocks if present (case-insensitive)
+        response_lower = response.lower()
+        if "```json" in response_lower:
+            match = re.search(r"```[jJ][sS][oO][nN]\s*(.*?)\s*```", response, re.DOTALL)
             if match:
-                return match.group(1)
-        elif "```yaml" in response or "```yml" in response:
-            match = re.search(r"```(?:yaml|yml)\s*(.*?)\s*```", response, re.DOTALL)
+                return match.group(1).strip()
+        if "```yaml" in response_lower or "```yml" in response_lower:
+            match = re.search(r"```(?:[yY][aA][mM][lL]|[yY][mM][lL])\s*(.*?)\s*```", response, re.DOTALL)
             if match:
-                return match.group(1)
-        elif "```" in response:
-            # Generic code block
-            match = re.search(r"```\s*(.*?)\s*```", response, re.DOTALL)
+                return match.group(1).strip()
+        if "```" in response:
+            # Generic code block - extract content
+            match = re.search(r"```\w*\s*(.*?)\s*```", response, re.DOTALL)
             if match:
-                return match.group(1)
+                return match.group(1).strip()
 
+        # Return stripped response - format detection will handle validation
         return response.strip()
 
     def _detect_format(self, response: str) -> str:
@@ -98,27 +102,38 @@ class TestCaseParser:
         Returns:
             Format type
         """
-        # Check for JSON
-        if response.startswith("[") or response.startswith("{"):
+        # Strip whitespace for detection
+        stripped = response.strip()
+
+        # Check for JSON (array or object)
+        if stripped.startswith("[") or stripped.startswith("{"):
             try:
-                json.loads(response)
+                json.loads(stripped)
+                self.logger.debug("Detected JSON format")
                 return "json"
-            except:
-                pass
+            except json.JSONDecodeError as e:
+                self.logger.debug(f"JSON detection failed: {e}")
 
         # Check for YAML
         if ":" in response and ("\n-" in response or "\n  " in response):
             try:
                 yaml.safe_load(response)
+                self.logger.debug("Detected YAML format")
                 return "yaml"
             except:
                 pass
 
         # Check for markdown patterns
         if "##" in response or "**Test Case" in response:
+            self.logger.debug("Detected markdown format")
             return "markdown"
 
-        # Default to text
+        # Default to JSON if it looks like JSON structure
+        if '"test_cases"' in stripped or '"id"' in stripped or '"title"' in stripped:
+            self.logger.debug("Detected JSON-like structure, forcing JSON parse")
+            return "json"
+
+        self.logger.debug("Defaulting to text format")
         return "text"
 
     def _parse_json(self, response: str) -> List[TestCase]:
@@ -133,21 +148,30 @@ class TestCaseParser:
         """
         try:
             data = json.loads(response)
+            self.logger.info(f"Successfully parsed JSON with {len(data) if isinstance(data, list) else 1} items")
 
-            # Handle both single test case and list
+            # Handle wrapper object with test_cases key
             if isinstance(data, dict):
-                data = [data]
+                if "test_cases" in data:
+                    data = data["test_cases"]
+                else:
+                    data = [data]
 
             test_cases = []
-            for item in data:
+            for i, item in enumerate(data):
+                self.logger.debug(f"Converting item {i} to TestCase: {list(item.keys()) if isinstance(item, dict) else type(item)}")
                 test_case = self._dict_to_test_case(item)
                 if test_case:
                     test_cases.append(test_case)
+                else:
+                    self.logger.warning(f"Failed to convert item {i} to TestCase")
 
+            self.logger.info(f"Converted {len(test_cases)} test cases from JSON")
             return test_cases
 
         except json.JSONDecodeError as e:
-            self.logger.error(f"JSON parse error: {e}")
+            self.logger.error(f"JSON parse error at position {e.pos}: {e.msg}")
+            self.logger.error(f"Response preview: {response[:500]}...")
             raise
 
     def _parse_yaml(self, response: str) -> List[TestCase]:

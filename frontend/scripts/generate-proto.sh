@@ -13,13 +13,21 @@ echo "Generating TypeScript code from proto files..."
 # Create output directory
 mkdir -p $OUT_DIR
 
-# Generate TypeScript code using ts-proto
+# Generate TypeScript code using ts-proto for test_cases.proto
 protoc \
   --plugin=./node_modules/.bin/protoc-gen-ts_proto \
   --ts_proto_out=$OUT_DIR \
   --ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
   -I=$PROTO_DIR \
   test_cases.proto
+
+# Generate TypeScript code using ts-proto for test_data.proto
+protoc \
+  --plugin=./node_modules/.bin/protoc-gen-ts_proto \
+  --ts_proto_out=$OUT_DIR \
+  --ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
+  -I=$PROTO_DIR \
+  test_data.proto
 
 echo "✓ Proto files generated successfully!"
 echo "  Output: $OUT_DIR/"

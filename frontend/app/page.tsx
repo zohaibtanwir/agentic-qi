@@ -51,8 +51,7 @@ export default function Home() {
             name="Test Data Agent"
             description="Create realistic, schema-compliant test data for your applications"
             status="operational"
-            link={process.env.NEXT_PUBLIC_TEST_DATA_AGENT_URL || 'http://localhost:3001'}
-            external
+            link="/test-data"
             features={[
               'Schema-based generation',
               'AI-powered realistic data',

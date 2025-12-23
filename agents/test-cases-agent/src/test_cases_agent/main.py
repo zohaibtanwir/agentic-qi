@@ -71,8 +71,8 @@ class TestCasesAgent:
             TestCasesService(), self.server
         )
 
-        # Bind to port
-        address = f"[::]:{self.settings.grpc_port}"
+        # Bind to port (0.0.0.0 for IPv4 compatibility with Docker)
+        address = f"0.0.0.0:{self.settings.grpc_port}"
         self.server.add_insecure_port(address)
 
         # Start server

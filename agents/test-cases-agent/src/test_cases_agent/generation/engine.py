@@ -41,6 +41,9 @@ class GenerationEngine:
         self.coverage_analyzer = CoverageAnalyzer()
         self.formatter = TestCaseFormatter()
 
+        # Track if test data agent is available (to avoid repeated connection attempts)
+        self._test_data_agent_available: Optional[bool] = None
+
     async def generate(
         self,
         request: TestCaseRequest,
@@ -261,10 +264,11 @@ class GenerationEngine:
             if request.domain_context and "requirements" in request.domain_context:
                 tc.metadata.related_requirements = request.domain_context["requirements"]
 
-            # Generate test data if needed
-            if tc.test_data is None and self.test_data_client:
+            # Generate test data if needed (skip if agent was previously unavailable)
+            if tc.test_data is None and self.test_data_client and self._test_data_agent_available is not False:
                 try:
                     await self.test_data_client.connect()
+                    self._test_data_agent_available = True
                     test_data_response = await self.test_data_client.generate_data(
                         entity=request.entity_type,
                         count=1,
@@ -273,7 +277,8 @@ class GenerationEngine:
                     if test_data_response.get("success") and test_data_response.get("data"):
                         tc.test_data = test_data_response["data"][0]
                 except Exception as e:
-                    self.logger.warning(f"Failed to generate test data: {e}")
+                    self._test_data_agent_available = False
+                    self.logger.info(f"Test Data Agent not available, skipping enrichment: {e}")
 
         return test_cases
 
