@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { ClientProviders } from "@/components/providers/ClientProviders";
 
 export const metadata: Metadata = {
   title: "QA Platform | AI-Powered Test Generation",
@@ -16,11 +17,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex flex-col min-h-screen">
-        <Header />
-        <div className="pt-16 flex-1 flex flex-col">
-          {children}
-        </div>
-        <Footer />
+        <ClientProviders>
+          <Header />
+          <div className="pt-16 flex-1 flex flex-col">
+            {children}
+          </div>
+          <Footer />
+        </ClientProviders>
       </body>
     </html>
   );

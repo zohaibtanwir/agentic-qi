@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTestDataStore } from '@/lib/stores/test-data-store';
+import { useToastActions } from '@/components/ui/Toast';
 
 type PreviewTab = 'json' | 'table' | 'stats';
 
@@ -13,27 +14,43 @@ export function DataPreview() {
     clearGeneratedData,
   } = useTestDataStore();
 
+  const toast = useToastActions();
   const [activeTab, setActiveTab] = useState<PreviewTab>('json');
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     if (!generatedData) return;
-    await navigator.clipboard.writeText(generatedData);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(generatedData);
+      setCopied(true);
+      toast.success('Copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy to clipboard');
+    }
   };
 
   const handleDownload = () => {
     if (!generatedData) return;
-    const blob = new Blob([generatedData], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `test-data-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const blob = new Blob([generatedData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `test-data-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Download started');
+    } catch {
+      toast.error('Failed to download file');
+    }
+  };
+
+  const handleClear = () => {
+    clearGeneratedData();
+    toast.info('Data cleared');
   };
 
   // Parse data for table view
@@ -89,7 +106,7 @@ export function DataPreview() {
                 </svg>
               </button>
               <button
-                onClick={clearGeneratedData}
+                onClick={handleClear}
                 className="p-2 text-gray-500 hover:text-red-500 transition-colors"
                 title="Clear"
               >

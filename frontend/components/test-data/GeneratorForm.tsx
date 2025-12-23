@@ -1,6 +1,7 @@
 'use client';
 
 import { useTestDataStore } from '@/lib/stores/test-data-store';
+import { useToastActions } from '@/components/ui/Toast';
 import { BasicConfigTab } from './BasicConfigTab';
 import { ScenariosTab } from './ScenariosTab';
 import { OutputTab } from './OutputTab';
@@ -20,7 +21,18 @@ export function GeneratorForm() {
     scenarios,
   } = useTestDataStore();
 
+  const toast = useToastActions();
   const scenarioCount = scenarios.length;
+
+  const handleGenerate = async () => {
+    try {
+      await generateData();
+      const recordCount = useTestDataStore.getState().lastResponse?.recordCount ?? 0;
+      toast.success(`Generated ${recordCount} records successfully`);
+    } catch {
+      toast.error('Failed to generate data. Please try again.');
+    }
+  };
 
   return (
     <div className="bg-white rounded-lg border border-[var(--border-default)] shadow-sm h-full flex flex-col">
@@ -65,7 +77,7 @@ export function GeneratorForm() {
       {/* Generate Button */}
       <div className="p-6 border-t border-[var(--border-default)]">
         <button
-          onClick={() => generateData()}
+          onClick={handleGenerate}
           disabled={isGenerating}
           className="w-full py-3 px-4 bg-[var(--accent-default)] text-white font-semibold rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
         >
