@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -17,10 +18,13 @@ export function Header() {
       <div className="flex items-center justify-between h-full px-6 max-w-7xl mx-auto">
         {/* Logo and title */}
         <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
-          <img
+          <Image
             src="https://assets.macysassets.com/app/navigation-wgl/static/images/logo.svg"
             alt="Macy's Logo"
-            className="h-8"
+            width={96}
+            height={32}
+            className="h-8 w-auto"
+            unoptimized
           />
           <span className="text-lg font-semibold text-[var(--text-secondary)]">
             QA Platform
