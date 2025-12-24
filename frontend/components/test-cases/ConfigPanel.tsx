@@ -86,7 +86,7 @@ export function ConfigPanel({
         <label className="block text-sm font-medium text-[var(--text-primary)] mb-3">
           Output Format
         </label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="flex flex-col gap-2">
           {[
             { value: OutputFormat.TRADITIONAL, label: 'Traditional', desc: 'Step-by-step format' },
             { value: OutputFormat.GHERKIN, label: 'Gherkin', desc: 'BDD format (Given/When/Then)' },
@@ -102,8 +102,10 @@ export function ConfigPanel({
                   : 'border-[var(--border-default)] bg-white hover:border-[var(--accent-default)]'
               }`}
             >
-              <div className="text-sm font-medium text-[var(--text-primary)]">{option.label}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">{option.desc}</div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-[var(--text-primary)]">{option.label}</span>
+                <span className="text-xs text-[var(--text-muted)]">{option.desc}</span>
+              </div>
             </button>
           ))}
         </div>
@@ -114,7 +116,7 @@ export function ConfigPanel({
         <label className="block text-sm font-medium text-[var(--text-primary)] mb-3">
           Coverage Level
         </label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="flex flex-col gap-2">
           {[
             { value: CoverageLevel.QUICK, label: 'Quick', desc: 'Happy path + critical negatives' },
             { value: CoverageLevel.STANDARD, label: 'Standard', desc: 'Comprehensive coverage' },
@@ -130,8 +132,10 @@ export function ConfigPanel({
                   : 'border-[var(--border-default)] bg-white hover:border-[var(--accent-default)]'
               }`}
             >
-              <div className="text-sm font-medium text-[var(--text-primary)]">{option.label}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">{option.desc}</div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-[var(--text-primary)]">{option.label}</span>
+                <span className="text-xs text-[var(--text-muted)]">{option.desc}</span>
+              </div>
             </button>
           ))}
         </div>

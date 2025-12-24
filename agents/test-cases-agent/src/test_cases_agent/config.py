@@ -64,7 +64,7 @@ class Settings(BaseSettings):
 
     # Weaviate Configuration
     weaviate_url: str = Field(
-        default="http://localhost:8084", description="Weaviate instance URL"
+        default="http://localhost:8080", description="Weaviate instance URL"
     )
     weaviate_api_key: Optional[str] = Field(
         default=None, description="Weaviate API key"

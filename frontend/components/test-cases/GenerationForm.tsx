@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { OutputFormat, CoverageLevel, TestType, TestCase } from '@/lib/grpc/generated/test_cases';
 import { useGenerateTestCases, InputType, GenerateFormData } from '@/hooks/useGenerateTestCases';
+import { useTestCasesStore, type TestCasesStore } from '@/lib/stores/test-cases-store';
 import { UserStoryTab } from './UserStoryTab';
 import { ApiSpecTab } from './ApiSpecTab';
 import { FreeFormTab } from './FreeFormTab';
@@ -17,7 +18,15 @@ const INPUT_TABS: { id: InputType; label: string; description: string }[] = [
 ];
 
 export function GenerationForm() {
-  const { generateTestCases, loading, error, testCases, metadata, reset } = useGenerateTestCases();
+  const { generateTestCases, loading, error, testCases: generatedTestCases, metadata, reset } = useGenerateTestCases();
+
+  // Get history-loaded test cases from the store
+  const storeTestCases = useTestCasesStore((state: TestCasesStore) => state.generatedTestCases);
+  const selectedSession = useTestCasesStore((state: TestCasesStore) => state.selectedSession);
+  const clearSelectedSession = useTestCasesStore((state: TestCasesStore) => state.clearSelectedSession);
+
+  // Combine local generated test cases with store test cases (from history)
+  const testCases = selectedSession ? storeTestCases : generatedTestCases;
 
   // Input type state
   const [inputType, setInputType] = useState<InputType>('user_story');
@@ -45,6 +54,14 @@ export function GenerationForm() {
   // Results state
   const [selectedTestCase, setSelectedTestCase] = useState<TestCase | null>(null);
   const [showConfig, setShowConfig] = useState(true);
+
+  // Sync form with selected history session
+  useEffect(() => {
+    if (selectedSession) {
+      setStory(selectedSession.userStory || '');
+      setAcceptanceCriteria(selectedSession.acceptanceCriteria?.length ? selectedSession.acceptanceCriteria : ['']);
+    }
+  }, [selectedSession]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,15 +249,25 @@ export function GenerationForm() {
           {/* Results Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-                Generated Test Cases
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                  {selectedSession ? 'History Session' : 'Generated Test Cases'}
+                </h2>
+                {selectedSession && (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                    From History
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-[var(--text-muted)] mt-1">
-                {testCases.length} test cases generated
+                {testCases.length} test cases {selectedSession ? 'loaded' : 'generated'}
               </p>
             </div>
             <button
-              onClick={reset}
+              onClick={() => {
+                reset();
+                clearSelectedSession();
+              }}
               className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent-default)] border border-[var(--border-default)] rounded-lg hover:border-[var(--accent-default)] transition-colors"
             >
               Clear Results

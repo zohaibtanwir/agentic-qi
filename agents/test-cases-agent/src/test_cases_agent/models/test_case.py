@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TestType(str, Enum):
@@ -46,8 +46,9 @@ class TestStep(BaseModel):
     )
     notes: Optional[str] = Field(default=None, description="Additional notes")
 
-    @validator("action", "expected_result")
-    def validate_not_empty(cls, v):
+    @field_validator("action", "expected_result")
+    @classmethod
+    def validate_not_empty(cls, v: str) -> str:
         """Ensure action and expected result are not empty."""
         if not v or not v.strip():
             raise ValueError("Field cannot be empty")
@@ -108,15 +109,17 @@ class TestCase(BaseModel):
         default=None, description="Coverage information"
     )
 
-    @validator("title", "description")
-    def validate_not_empty(cls, v):
+    @field_validator("title", "description")
+    @classmethod
+    def validate_not_empty_tc(cls, v: str) -> str:
         """Ensure title and description are not empty."""
         if not v or not v.strip():
             raise ValueError("Field cannot be empty")
         return v.strip()
 
-    @validator("steps")
-    def validate_steps(cls, v):
+    @field_validator("steps")
+    @classmethod
+    def validate_steps(cls, v: List[TestStep]) -> List[TestStep]:
         """Ensure at least one step exists."""
         if not v:
             raise ValueError("Test case must have at least one step")
@@ -134,13 +137,7 @@ class TestCase(BaseModel):
         """Convert to JSON string."""
         return self.model_dump_json(exclude_none=True, indent=2)
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class TestCaseRequest(BaseModel):
@@ -189,23 +186,26 @@ class TestCaseRequest(BaseModel):
         default="standard", description="Format style: standard, bdd, minimal"
     )
 
-    @validator("requirement", "entity_type")
-    def validate_not_empty(cls, v):
+    @field_validator("requirement", "entity_type")
+    @classmethod
+    def validate_not_empty_request(cls, v: str) -> str:
         """Ensure required fields are not empty."""
         if not v or not v.strip():
             raise ValueError("Field cannot be empty")
         return v.strip()
 
-    @validator("detail_level")
-    def validate_detail_level(cls, v):
+    @field_validator("detail_level")
+    @classmethod
+    def validate_detail_level(cls, v: str) -> str:
         """Validate detail level."""
         valid_levels = ["low", "medium", "high"]
         if v not in valid_levels:
             raise ValueError(f"Detail level must be one of {valid_levels}")
         return v
 
-    @validator("format_style")
-    def validate_format_style(cls, v):
+    @field_validator("format_style")
+    @classmethod
+    def validate_format_style(cls, v: str) -> str:
         """Validate format style."""
         valid_styles = ["standard", "bdd", "minimal"]
         if v not in valid_styles:
@@ -258,11 +258,10 @@ class TestCaseResponse(BaseModel):
         default=None, description="Detailed error information"
     )
 
-    @validator("test_cases")
-    def validate_test_cases_count(cls, v, values):
-        """Validate test cases count matches."""
-        if "count" in values and len(v) != values["count"]:
-            values["count"] = len(v)  # Update count to match actual
+    @field_validator("test_cases")
+    @classmethod
+    def validate_test_cases_list(cls, v: List["TestCase"]) -> List["TestCase"]:
+        """Validate test cases list."""
         return v
 
     def add_test_case(self, test_case: TestCase) -> None:
@@ -300,10 +299,4 @@ class TestCaseResponse(BaseModel):
         """Convert to JSON string."""
         return self.model_dump_json(exclude_none=True, indent=2)
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    model_config = ConfigDict(use_enum_values=True)

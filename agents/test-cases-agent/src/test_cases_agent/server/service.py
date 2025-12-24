@@ -87,14 +87,14 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
             # Extract user story and acceptance criteria for history
             user_story = ""
             acceptance_criteria = []
-            if proto_request.HasField("user_story"):
-                user_story = proto_request.user_story.story
-                acceptance_criteria = list(proto_request.user_story.acceptance_criteria)
-            elif proto_request.HasField("free_form"):
-                user_story = proto_request.free_form.requirement
+            if request.HasField("user_story"):
+                user_story = request.user_story.story
+                acceptance_criteria = list(request.user_story.acceptance_criteria)
+            elif request.HasField("free_form"):
+                user_story = request.free_form.requirement
 
             # Determine test types
-            test_types = [self._proto_to_model_test_type(tt).value for tt in proto_request.generation_config.test_types] if proto_request.generation_config.test_types else ["functional"]
+            test_types = [self._proto_to_model_test_type(tt).value for tt in request.generation_config.test_types] if request.generation_config.test_types else ["functional"]
 
             # Save to history (non-blocking, fire and forget)
             try:
@@ -102,9 +102,9 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
                     user_story=user_story,
                     acceptance_criteria=acceptance_criteria,
                     test_cases=test_cases_for_history,
-                    domain=proto_request.domain_config.domain if proto_request.HasField("domain_config") else "",
+                    domain=request.domain_config.domain if request.HasField("domain_config") else "",
                     test_types=test_types,
-                    coverage_level=self._coverage_level_to_string(proto_request.generation_config.coverage_level),
+                    coverage_level=self._coverage_level_to_string(request.generation_config.coverage_level),
                     generation_method="llm",
                     model_used=generation_response.llm_provider,
                     generation_time_ms=int(generation_response.generation_time_ms),
@@ -431,15 +431,16 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
             # Convert to proto summaries
             proto_sessions = []
             for session in sessions:
+                # Ensure all fields are the correct type for protobuf
                 proto_sessions.append(test_cases_pb2.HistorySessionSummary(
-                    session_id=session.session_id,
-                    user_story_preview=session.get_preview(),
-                    domain=session.domain,
-                    test_types=session.test_types,
-                    coverage_level=session.coverage_level,
-                    test_case_count=session.test_case_count,
-                    status=session.status,
-                    created_at=session.created_at,
+                    session_id=str(session.session_id) if session.session_id else "",
+                    user_story_preview=str(session.get_preview()) if session.get_preview() else "",
+                    domain=str(session.domain) if session.domain else "",
+                    test_types=list(session.test_types) if session.test_types else [],
+                    coverage_level=str(session.coverage_level) if session.coverage_level else "",
+                    test_case_count=int(session.test_case_count) if session.test_case_count else 0,
+                    status=str(session.status) if session.status else "",
+                    created_at=str(session.created_at) if session.created_at else "",
                 ))
 
             response = test_cases_pb2.ListHistoryResponse(
@@ -498,23 +499,24 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
                 # Convert metadata to string map
                 metadata = {k: str(v) for k, v in session.metadata.items()}
 
+                # Ensure all fields are correct types for protobuf
                 proto_session = test_cases_pb2.HistorySession(
-                    session_id=session.session_id,
-                    user_story=session.user_story,
-                    acceptance_criteria=session.acceptance_criteria,
-                    domain=session.domain,
-                    test_types=session.test_types,
-                    coverage_level=session.coverage_level,
+                    session_id=str(session.session_id) if session.session_id else "",
+                    user_story=str(session.user_story) if session.user_story else "",
+                    acceptance_criteria=list(session.acceptance_criteria) if session.acceptance_criteria else [],
+                    domain=str(session.domain) if session.domain else "",
+                    test_types=list(session.test_types) if session.test_types else [],
+                    coverage_level=str(session.coverage_level) if session.coverage_level else "",
                     test_cases=proto_test_cases,
-                    test_case_count=session.test_case_count,
-                    generation_method=session.generation_method,
-                    model_used=session.model_used,
-                    generation_time_ms=session.generation_time_ms,
-                    status=session.status,
-                    error_message=session.error_message,
+                    test_case_count=int(session.test_case_count) if session.test_case_count else 0,
+                    generation_method=str(session.generation_method) if session.generation_method else "",
+                    model_used=str(session.model_used) if session.model_used else "",
+                    generation_time_ms=int(session.generation_time_ms) if session.generation_time_ms else 0,
+                    status=str(session.status) if session.status else "",
+                    error_message=str(session.error_message) if session.error_message else "",
                     metadata=metadata,
-                    created_at=session.created_at,
-                    updated_at=session.updated_at,
+                    created_at=str(session.created_at) if session.created_at else "",
+                    updated_at=str(session.updated_at) if session.updated_at else "",
                 )
 
                 response = test_cases_pb2.GetHistorySessionResponse(

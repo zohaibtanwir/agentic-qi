@@ -148,11 +148,8 @@ async function grpcWebUnaryCall<TRequest, TResponse>(
     throw new Error(`gRPC error (${grpcStatus}): ${decodeURIComponent(grpcMessage)}`);
   }
 
-  // Decode the response
-  if (respBytes.length === 0) {
-    throw new Error('Empty response from server');
-  }
-
+  // Decode the response - empty bytes is valid for empty messages
+  // In protobuf, an empty message encodes to zero bytes
   return decode(respBytes);
 }
 

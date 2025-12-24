@@ -14,21 +14,21 @@
   "description": "Macy's Test Data Platform - AI-powered test data generation",
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
-    "@types/node": "^25.0.2",
+    "@types/node": "^22.0.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "autoprefixer": "^10.4.23",
+    "autoprefixer": "^10.4.20",
     "axios": "^1.13.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.561.0",
-    "next": "^16.0.10",
+    "lucide-react": "^0.469.0",
+    "next": "^15.5.9",
     "postcss": "^8.5.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "tailwind-merge": "^3.4.0",
-    "tailwindcss": "^3.4.19",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.9.3"
+    "typescript": "^5.7.3"
   }
 }

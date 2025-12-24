@@ -194,7 +194,8 @@ class HistoryRepository:
             return [HistorySession.from_dict(data) for data in data_list]
         except Exception as e:
             logger.error(f"Failed to list history sessions: {e}")
-            raise
+            # Return empty list instead of raising - allows UI to work without Weaviate
+            return []
 
     async def delete(self, session_id: str) -> bool:
         """
