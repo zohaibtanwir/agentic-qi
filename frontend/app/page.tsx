@@ -64,13 +64,13 @@ export default function Home() {
           <AgentCard
             name="eCommerce Domain Agent"
             description="Specialized agent with deep eCommerce domain knowledge and validation"
-            status="coming_soon"
-            link="#"
+            status="operational"
+            link="/ecommerce"
             features={[
+              'Domain entities & workflows',
               'Business rules validation',
               'Edge case identification',
-              'Domain-specific scenarios',
-              'Integration test generation',
+              'Context-aware test data',
             ]}
           />
         </div>
