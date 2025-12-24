@@ -497,38 +497,9 @@ class TestTestDataAgentClient:
                 assert result["status"] == "healthy"
                 assert "components" in result
 
-    def test_map_output_format(self):
-        """Test output format mapping."""
-        client = TestDataAgentClient()
-
-        from ecommerce_agent.proto import test_data_pb2 as td_pb2
-
-        assert client._map_output_format("JSON") == td_pb2.OutputFormat.JSON
-        assert client._map_output_format("CSV") == td_pb2.OutputFormat.CSV
-        assert client._map_output_format("SQL") == td_pb2.OutputFormat.SQL
-        assert client._map_output_format("invalid") == td_pb2.OutputFormat.JSON  # default
-
-    def test_build_constraints(self):
-        """Test constraint building."""
-        client = TestDataAgentClient()
-
-        constraints_dict = {
-            "quantity": {"min": 1, "max": 99},
-            "name": {"min_length": 1, "max_length": 255},
-            "status": {"enum_values": ["pending", "completed"]},
-        }
-
-        pb_constraints = client._build_constraints(constraints_dict)
-
-        assert "quantity" in pb_constraints.field_constraints
-        assert pb_constraints.field_constraints["quantity"].min == 1
-        assert pb_constraints.field_constraints["quantity"].max == 99
-
-        assert "name" in pb_constraints.field_constraints
-        assert pb_constraints.field_constraints["name"].min_length == 1
-
-        assert "status" in pb_constraints.field_constraints
-        assert len(pb_constraints.field_constraints["status"].enum_values) == 2
+# NOTE: test_map_output_format and test_build_constraints were removed
+# as these methods were inlined into generate_data during refactoring.
+# The functionality is covered by the generate_data integration tests.
 
 
 # ========== Integration Tests ==========

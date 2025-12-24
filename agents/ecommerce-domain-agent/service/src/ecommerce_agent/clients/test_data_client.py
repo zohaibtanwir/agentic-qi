@@ -130,18 +130,52 @@ class TestDataAgentClient:
         try:
             await self.connect()
 
-            # Build the request - only use fields that exist in proto
+            # Map output format string to enum
+            output_format_map = {
+                "JSON": td_pb2.OutputFormat.JSON,
+                "CSV": td_pb2.OutputFormat.CSV,
+                "SQL": td_pb2.OutputFormat.SQL,
+            }
+            output_format_enum = output_format_map.get(output_format, td_pb2.OutputFormat.JSON)
+
+            # Map generation method string to enum
+            gen_method_map = {
+                "TRADITIONAL": td_pb2.GenerationMethod.TRADITIONAL,
+                "LLM": td_pb2.GenerationMethod.LLM,
+                "RAG": td_pb2.GenerationMethod.RAG,
+                "HYBRID": td_pb2.GenerationMethod.HYBRID,
+            }
+            gen_method_enum = gen_method_map.get(generation_method, td_pb2.GenerationMethod.HYBRID)
+
+            # Build the request
             request = td_pb2.GenerateRequest(
                 request_id=request_id,
                 domain=domain,
                 entity=entity,
                 count=count,
                 context=context,
-                output_format=output_format,  # Use string directly, not enum
+                output_format=output_format_enum,
+                generation_method=gen_method_enum,
+                production_like=production_like,
+                use_cache=use_cache,
             )
 
-            # Add scenarios as strings (proto has repeated string scenarios field 6)
-            request.scenarios.extend([s.get("name", "") for s in scenarios])
+            # Add scenarios as Scenario messages
+            for scenario in scenarios:
+                if isinstance(scenario, dict):
+                    scenario_msg = td_pb2.Scenario(
+                        name=scenario.get("name", ""),
+                        count=scenario.get("count", 0),
+                        description=scenario.get("description", ""),
+                    )
+                    # Add overrides if present
+                    if "overrides" in scenario:
+                        for k, v in scenario["overrides"].items():
+                            scenario_msg.overrides[k] = str(v)
+                    request.scenarios.append(scenario_msg)
+                elif isinstance(scenario, str):
+                    # Handle string scenarios (convert to Scenario message)
+                    request.scenarios.append(td_pb2.Scenario(name=scenario))
 
             # Note: Constraints message doesn't exist in current proto
             # If needed, constraints can be passed via context field

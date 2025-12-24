@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 import uvicorn
 
 from ecommerce_agent.config import get_settings
-from ecommerce_agent.server.grpc_server import create_server
+from ecommerce_agent.server.grpc_server_enhanced import create_enhanced_server
 from ecommerce_agent.server.health import create_health_app
 from ecommerce_agent.utils.logging import setup_logging, get_logger
 
@@ -14,10 +14,10 @@ logger = get_logger(__name__)
 
 
 async def run_grpc_server(port: int) -> None:
-    """Run the gRPC server."""
-    server = await create_server(port)
+    """Run the enhanced gRPC server with knowledge layer."""
+    server = await create_enhanced_server(port, use_knowledge=True)
     await server.start()
-    logger.info("gRPC server started", port=port)
+    logger.info("Enhanced gRPC server started", port=port)
 
     # Wait for termination
     await server.wait_for_termination()

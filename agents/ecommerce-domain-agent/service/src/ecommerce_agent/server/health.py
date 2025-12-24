@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from ecommerce_agent.config import get_settings
 from ecommerce_agent.utils.logging import get_logger
 from ecommerce_agent.server.api import add_api_routes
+from ecommerce_agent.clients.weaviate_client import get_weaviate_client
 
 logger = get_logger(__name__)
 
@@ -41,13 +42,26 @@ def create_health_app() -> FastAPI:
     # Track component health
     component_status: dict[str, str] = {
         "grpc": "healthy",  # gRPC server is running locally
-        "weaviate": "disabled",  # Not running for local demo
+        "weaviate": "unknown",
         "test_data_agent": "disabled",  # Not running for local demo
     }
+
+    def check_weaviate_health() -> str:
+        """Check Weaviate connection status."""
+        try:
+            client = get_weaviate_client()
+            if client.is_connected():
+                return "healthy"
+            return "unhealthy"
+        except Exception:
+            return "unhealthy"
 
     @app.get("/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
         """Basic health check."""
+        # Check Weaviate status
+        component_status["weaviate"] = check_weaviate_health()
+
         # Consider "disabled" as ok for local demo
         critical_components = [v for k, v in component_status.items() if v != "disabled"]
         if not critical_components or all(s == "healthy" for s in critical_components):

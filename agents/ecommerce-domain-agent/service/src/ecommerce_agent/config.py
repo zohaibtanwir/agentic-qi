@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # RAG - Weaviate
     weaviate_url: str = Field(default="http://weaviate:8080", env="WEAVIATE_URL")
     weaviate_api_key: str = Field(default="", env="WEAVIATE_API_KEY")
+    weaviate_grpc_port: int = Field(default=50051, env="WEAVIATE_GRPC_PORT")
 
     # Test Data Agent (client)
     test_data_agent_host: str = "localhost"

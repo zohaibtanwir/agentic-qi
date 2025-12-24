@@ -405,18 +405,40 @@ class EnhancedEcommerceDomainServicer(pb2_grpc.EcommerceDomainServiceServicer):
                 store_patterns=True,
             )
 
-            # Build generation request
+            # Map proto generation method to string
+            generation_method_map = {
+                0: "HYBRID",  # UNSPECIFIED defaults to HYBRID
+                1: "TRADITIONAL",
+                2: "LLM",
+                3: "RAG",
+                4: "HYBRID",
+            }
+            gen_method = generation_method_map.get(request.generation_method, "HYBRID")
+
+            # Convert proto string scenarios to dict format expected by orchestrator
+            scenarios_list = None
+            if request.scenarios:
+                scenarios_list = []
+                for scenario_name in request.scenarios:
+                    scenarios_list.append({
+                        "name": scenario_name,
+                        "count": 1,
+                        "description": f"User-requested scenario: {scenario_name}",
+                    })
+
+            # Build generation request using correct proto field names
             gen_request = GenerationRequest(
                 entity=request.entity,
                 count=request.count,
-                workflow=request.workflow if request.workflow else None,
-                scenario=request.scenario if request.scenario else None,
-                context=request.context if request.context else None,
-                scenarios=list(request.scenarios) if request.scenarios else None,
+                workflow=request.workflow_context if request.workflow_context else None,
+                scenario=None,  # Not in proto, derived from scenarios
+                context=request.custom_context if request.custom_context else None,
+                scenarios=scenarios_list,
                 output_format=request.output_format if request.output_format else "JSON",
                 include_edge_cases=request.include_edge_cases,
                 production_like=request.production_like,
                 use_cache=request.use_cache,
+                generation_method=gen_method,
             )
 
             # Validate request
@@ -443,16 +465,20 @@ class EnhancedEcommerceDomainServicer(pb2_grpc.EcommerceDomainServiceServicer):
                 error=result.error if result.error else "",
             )
 
-            # Add metadata if available
-            if result.metadata or result.enrichment_metadata or result.generation_metadata:
-                metadata = {}
-                if result.metadata:
-                    metadata["request"] = result.metadata
+            # Add metadata if available - using proper GenerationMetadata message
+            if result.generation_metadata:
+                gen_meta = result.generation_metadata
+                response.metadata.generation_path = gen_meta.get("generation_path", "")
+                response.metadata.llm_tokens_used = gen_meta.get("llm_tokens_used", 0)
+                response.metadata.generation_time_ms = gen_meta.get("generation_time_ms", 0.0)
+                response.metadata.coherence_score = gen_meta.get("coherence_score", 0.0)
+                # Add domain context summary
                 if result.enrichment_metadata:
-                    metadata["enrichment"] = result.enrichment_metadata
-                if result.generation_metadata:
-                    metadata["generation"] = result.generation_metadata
-                response.metadata = json.dumps(metadata)
+                    response.metadata.domain_context_used = json.dumps(result.enrichment_metadata)
+                # Add scenario counts
+                if gen_meta.get("scenario_counts"):
+                    for k, v in gen_meta["scenario_counts"].items():
+                        response.metadata.scenario_counts[k] = v
 
             logger.info(
                 "Test data generation complete",

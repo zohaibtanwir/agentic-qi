@@ -5,8 +5,105 @@ from typing import Any
 from ecommerce_agent.proto import ecommerce_domain_pb2 as pb2
 from ecommerce_agent.proto import ecommerce_domain_pb2_grpc as pb2_grpc
 from ecommerce_agent.utils.logging import get_logger, bind_context
+from ecommerce_agent.domain.entities import list_entities, get_entity, EntityDefinition
+from ecommerce_agent.domain.workflows import list_workflows, get_workflow, WorkflowDefinition
 
 logger = get_logger(__name__)
+
+
+def _entity_to_pb(entity: EntityDefinition) -> pb2.Entity:
+    """Convert EntityDefinition to protobuf Entity."""
+    fields = [
+        pb2.EntityField(
+            name=f.name,
+            type=f.type,
+            description=f.description,
+            required=f.required,
+            example=f.example or "",
+        )
+        for f in entity.fields
+    ]
+    relationships = [
+        pb2.EntityRelationship(
+            target_entity=r.target,
+            relationship_type=r.type,
+            description=r.description,
+        )
+        for r in entity.relationships
+    ]
+    # Convert business_rules strings to BusinessRule messages
+    rules = [
+        pb2.BusinessRule(
+            id=f"BR{i+1:03d}",
+            name=rule.split(":")[0].strip() if ":" in rule else f"Rule {i+1}",
+            description=rule.split(":")[-1].strip() if ":" in rule else rule,
+            entity=entity.name,
+        )
+        for i, rule in enumerate(entity.business_rules)
+    ]
+    return pb2.Entity(
+        name=entity.name,
+        description=entity.description,
+        fields=fields,
+        rules=rules,
+        relationships=relationships,
+        edge_cases=entity.edge_cases,
+        test_scenarios=entity.test_scenarios,
+    )
+
+
+def _entity_to_summary_pb(entity: EntityDefinition) -> pb2.EntitySummary:
+    """Convert EntityDefinition to protobuf EntitySummary."""
+    return pb2.EntitySummary(
+        name=entity.name,
+        description=entity.description,
+        category=entity.category,
+        field_count=len(entity.fields),
+    )
+
+
+def _workflow_to_pb(workflow: WorkflowDefinition) -> pb2.Workflow:
+    """Convert WorkflowDefinition to protobuf Workflow."""
+    steps = [
+        pb2.WorkflowStep(
+            order=s.order,
+            name=s.name,
+            description=s.description,
+            entity=s.entity,
+            action=s.action,
+            validations=s.validations,
+            possible_outcomes=s.possible_outcomes,
+        )
+        for s in workflow.steps
+    ]
+    # Convert business_rules strings to BusinessRule messages
+    rules = [
+        pb2.BusinessRule(
+            id=f"WBR{i+1:03d}",
+            name=f"Workflow Rule {i+1}",
+            description=rule,
+        )
+        for i, rule in enumerate(workflow.business_rules)
+    ]
+    return pb2.Workflow(
+        name=workflow.name,
+        description=workflow.description,
+        steps=steps,
+        involved_entities=workflow.involved_entities,
+        rules=rules,
+        edge_cases=workflow.edge_cases,
+        test_scenarios=workflow.test_scenarios,
+    )
+
+
+def _workflow_to_summary_pb(workflow: WorkflowDefinition) -> pb2.WorkflowSummary:
+    """Convert WorkflowDefinition to protobuf WorkflowSummary."""
+    return pb2.WorkflowSummary(
+        name=workflow.name,
+        description=workflow.description,
+        step_count=len(workflow.steps),
+        involved_entities=workflow.involved_entities,
+    )
 
 
 class EcommerceDomainServicer(pb2_grpc.EcommerceDomainServiceServicer):
@@ -56,13 +153,13 @@ class EcommerceDomainServicer(pb2_grpc.EcommerceDomainServiceServicer):
         """Get entity details."""
         logger.info("Getting entity", entity=request.entity_name)
 
-        # TODO: Implement
-        return pb2.EntityResponse(
-            entity=pb2.Entity(
-                name=request.entity_name,
-                description="Entity placeholder",
-            )
-        )
+        entity = get_entity(request.entity_name)
+        if entity:
+            return pb2.EntityResponse(entity=_entity_to_pb(entity))
+        else:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(f"Entity '{request.entity_name}' not found")
+            return pb2.EntityResponse()
 
     async def GetWorkflow(
         self,
@@ -72,13 +169,13 @@ class EcommerceDomainServicer(pb2_grpc.EcommerceDomainServiceServicer):
         """Get workflow details."""
         logger.info("Getting workflow", workflow=request.workflow_name)
 
-        # TODO: Implement
-        return pb2.WorkflowResponse(
-            workflow=pb2.Workflow(
-                name=request.workflow_name,
-                description="Workflow placeholder",
-            )
-        )
+        workflow = get_workflow(request.workflow_name)
+        if workflow:
+            return pb2.WorkflowResponse(workflow=_workflow_to_pb(workflow))
+        else:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(f"Workflow '{request.workflow_name}' not found")
+            return pb2.WorkflowResponse()
 
     async def ListEntities(
         self,
@@ -86,10 +183,12 @@ class EcommerceDomainServicer(pb2_grpc.EcommerceDomainServiceServicer):
         context: grpc.aio.ServicerContext,
     ) -> pb2.ListEntitiesResponse:
         """List all entities."""
-        logger.info("Listing entities", category=request.category)
+        category = request.category if request.category else None
+        logger.info("Listing entities", category=category)
 
-        # TODO: Implement
-        return pb2.ListEntitiesResponse(entities=[])
+        entities = list_entities(category)
+        pb_entities = [_entity_to_summary_pb(e) for e in entities]
+        return pb2.ListEntitiesResponse(entities=pb_entities)
 
     async def ListWorkflows(
         self,
@@ -99,8 +198,9 @@ class EcommerceDomainServicer(pb2_grpc.EcommerceDomainServiceServicer):
         """List all workflows."""
         logger.info("Listing workflows")
 
-        # TODO: Implement
-        return pb2.ListWorkflowsResponse(workflows=[])
+        workflows = list_workflows()
+        pb_workflows = [_workflow_to_summary_pb(w) for w in workflows]
+        return pb2.ListWorkflowsResponse(workflows=pb_workflows)
 
     async def GetEdgeCases(
         self,
@@ -110,8 +210,34 @@ class EcommerceDomainServicer(pb2_grpc.EcommerceDomainServiceServicer):
         """Get edge cases."""
         logger.info("Getting edge cases", entity=request.entity, workflow=request.workflow)
 
-        # TODO: Implement
-        return pb2.EdgeCasesResponse(edge_cases=[])
+        edge_case_strs = []
+        entity_name = request.entity if request.entity else ""
+        workflow_name = request.workflow if request.workflow else ""
+
+        if request.entity:
+            entity = get_entity(request.entity)
+            if entity:
+                edge_case_strs.extend(entity.edge_cases)
+        if request.workflow:
+            workflow = get_workflow(request.workflow)
+            if workflow:
+                edge_case_strs.extend(workflow.edge_cases)
+
+        # Deduplicate and convert to EdgeCase messages
+        seen = set()
+        edge_cases = []
+        for i, ec_str in enumerate(edge_case_strs):
+            if ec_str not in seen:
+                seen.add(ec_str)
+                edge_cases.append(pb2.EdgeCase(
+                    id=f"EC{i+1:03d}",
+                    name=ec_str[:50] + "..." if len(ec_str) > 50 else ec_str,
+                    description=ec_str,
+                    entity=entity_name,
+                    workflow=workflow_name,
+                ))
+
+        return pb2.EdgeCasesResponse(edge_cases=edge_cases)
 
     async def GenerateTestData(
         self,

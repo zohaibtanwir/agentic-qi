@@ -41,9 +41,8 @@ class WeaviateClient:
                 host = url
                 port = 8080  # Default Weaviate port
 
-            # Determine gRPC port based on environment
-            # If running locally with Docker, use mapped port
-            grpc_port = 50061 if host == "localhost" else 50051
+            # Use configured gRPC port from settings
+            grpc_port = self.settings.weaviate_grpc_port
 
             # For local development with Docker - use v4 API
             self._client = weaviate.connect_to_local(

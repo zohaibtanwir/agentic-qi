@@ -17,6 +17,7 @@ def mock_settings():
     settings.log_level = "DEBUG"
     settings.anthropic_api_key = "test-key"
     settings.weaviate_url = "http://localhost:8080"
+    settings.weaviate_grpc_port = 50051
     settings.test_data_agent_host = "localhost"
     settings.test_data_agent_port = 9001
     return settings
