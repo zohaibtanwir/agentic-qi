@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from test_cases_agent.proto import test_cases_pb2 as test__cases__pb2
+import test_cases_pb2 as test__cases__pb2
 
-GRPC_GENERATED_VERSION = '1.71.0'
+GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in test_cases_pb2_grpc.py depends on'
+        + ' but the generated code in test_cases_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -63,6 +63,21 @@ class TestCasesServiceStub(object):
                 '/testcases.v1.TestCasesService/HealthCheck',
                 request_serializer=test__cases__pb2.HealthCheckRequest.SerializeToString,
                 response_deserializer=test__cases__pb2.HealthCheckResponse.FromString,
+                _registered_method=True)
+        self.ListHistory = channel.unary_unary(
+                '/testcases.v1.TestCasesService/ListHistory',
+                request_serializer=test__cases__pb2.ListHistoryRequest.SerializeToString,
+                response_deserializer=test__cases__pb2.ListHistoryResponse.FromString,
+                _registered_method=True)
+        self.GetHistorySession = channel.unary_unary(
+                '/testcases.v1.TestCasesService/GetHistorySession',
+                request_serializer=test__cases__pb2.GetHistorySessionRequest.SerializeToString,
+                response_deserializer=test__cases__pb2.GetHistorySessionResponse.FromString,
+                _registered_method=True)
+        self.DeleteHistorySession = channel.unary_unary(
+                '/testcases.v1.TestCasesService/DeleteHistorySession',
+                request_serializer=test__cases__pb2.DeleteHistorySessionRequest.SerializeToString,
+                response_deserializer=test__cases__pb2.DeleteHistorySessionResponse.FromString,
                 _registered_method=True)
 
 
@@ -111,6 +126,29 @@ class TestCasesServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListHistory(self, request, context):
+        """============ History Operations ============
+
+        List generation history sessions
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetHistorySession(self, request, context):
+        """Get a specific history session with full test cases
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteHistorySession(self, request, context):
+        """Delete a history session
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_TestCasesServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -143,6 +181,21 @@ def add_TestCasesServiceServicer_to_server(servicer, server):
                     servicer.HealthCheck,
                     request_deserializer=test__cases__pb2.HealthCheckRequest.FromString,
                     response_serializer=test__cases__pb2.HealthCheckResponse.SerializeToString,
+            ),
+            'ListHistory': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListHistory,
+                    request_deserializer=test__cases__pb2.ListHistoryRequest.FromString,
+                    response_serializer=test__cases__pb2.ListHistoryResponse.SerializeToString,
+            ),
+            'GetHistorySession': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetHistorySession,
+                    request_deserializer=test__cases__pb2.GetHistorySessionRequest.FromString,
+                    response_serializer=test__cases__pb2.GetHistorySessionResponse.SerializeToString,
+            ),
+            'DeleteHistorySession': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteHistorySession,
+                    request_deserializer=test__cases__pb2.DeleteHistorySessionRequest.FromString,
+                    response_serializer=test__cases__pb2.DeleteHistorySessionResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -307,6 +360,87 @@ class TestCasesService(object):
             '/testcases.v1.TestCasesService/HealthCheck',
             test__cases__pb2.HealthCheckRequest.SerializeToString,
             test__cases__pb2.HealthCheckResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListHistory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/testcases.v1.TestCasesService/ListHistory',
+            test__cases__pb2.ListHistoryRequest.SerializeToString,
+            test__cases__pb2.ListHistoryResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetHistorySession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/testcases.v1.TestCasesService/GetHistorySession',
+            test__cases__pb2.GetHistorySessionRequest.SerializeToString,
+            test__cases__pb2.GetHistorySessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteHistorySession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/testcases.v1.TestCasesService/DeleteHistorySession',
+            test__cases__pb2.DeleteHistorySessionRequest.SerializeToString,
+            test__cases__pb2.DeleteHistorySessionResponse.FromString,
             options,
             channel_credentials,
             insecure,

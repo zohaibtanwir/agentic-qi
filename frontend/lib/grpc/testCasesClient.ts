@@ -8,10 +8,24 @@ import {
   GenerateTestCasesResponse as GenerateTestCasesResponseMsg,
   HealthCheckRequest as HealthCheckRequestMsg,
   HealthCheckResponse as HealthCheckResponseMsg,
+  ListHistoryRequest as ListHistoryRequestMsg,
+  ListHistoryResponse as ListHistoryResponseMsg,
+  GetHistorySessionRequest as GetHistorySessionRequestMsg,
+  GetHistorySessionResponse as GetHistorySessionResponseMsg,
+  DeleteHistorySessionRequest as DeleteHistorySessionRequestMsg,
+  DeleteHistorySessionResponse as DeleteHistorySessionResponseMsg,
   type GenerateTestCasesRequest,
   type GenerateTestCasesResponse,
   type HealthCheckResponse,
   type TestCase,
+  type ListHistoryRequest,
+  type ListHistoryResponse,
+  type GetHistorySessionRequest,
+  type GetHistorySessionResponse,
+  type DeleteHistorySessionRequest,
+  type DeleteHistorySessionResponse,
+  type HistorySessionSummary,
+  type HistorySession,
 } from './generated/test_cases';
 
 const GRPC_WEB_URL = process.env.NEXT_PUBLIC_GRPC_WEB_URL || 'http://localhost:8085';
@@ -333,6 +347,148 @@ export const testCasesClient = {
       HealthCheckResponseMsg.decode
     );
   },
+
+  // ============ History Methods ============
+
+  async listHistory(request: ListHistoryRequest): Promise<ListHistoryResponse> {
+    if (isMockMode()) {
+      // Return mock history data
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return {
+        sessions: [
+          {
+            sessionId: 'mock-session-1',
+            userStoryPreview: 'As a user, I want to login to the system...',
+            domain: 'ecommerce',
+            testTypes: ['functional', 'negative'],
+            coverageLevel: 'standard',
+            testCaseCount: 5,
+            status: 'success',
+            createdAt: new Date(Date.now() - 3600000).toISOString(),
+          },
+          {
+            sessionId: 'mock-session-2',
+            userStoryPreview: 'As a customer, I want to add items to cart...',
+            domain: 'ecommerce',
+            testTypes: ['functional', 'boundary'],
+            coverageLevel: 'comprehensive',
+            testCaseCount: 8,
+            status: 'success',
+            createdAt: new Date(Date.now() - 7200000).toISOString(),
+          },
+        ],
+        totalCount: 2,
+      };
+    }
+
+    return grpcWebUnaryCall<ListHistoryRequest, ListHistoryResponse>(
+      GRPC_WEB_URL,
+      'testcases.v1.TestCasesService/ListHistory',
+      request,
+      ListHistoryRequestMsg.encode,
+      ListHistoryResponseMsg.decode
+    );
+  },
+
+  async getHistorySession(request: GetHistorySessionRequest): Promise<GetHistorySessionResponse> {
+    if (isMockMode()) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      if (request.sessionId === 'mock-session-1') {
+        return {
+          session: {
+            sessionId: 'mock-session-1',
+            userStory: 'As a user, I want to login to the system so that I can access my account',
+            acceptanceCriteria: [
+              'User can enter email and password',
+              'System validates credentials',
+              'User is redirected to dashboard on success',
+            ],
+            domain: 'ecommerce',
+            testTypes: ['functional', 'negative'],
+            coverageLevel: 'standard',
+            testCases: generateMockTestCases({
+              requestId: 'mock',
+              userStory: { story: 'Login test', acceptanceCriteria: [], additionalContext: '' },
+              generationConfig: {
+                testTypes: [TestType.FUNCTIONAL, TestType.NEGATIVE],
+                maxTestCases: 5,
+                outputFormat: OutputFormat.TRADITIONAL,
+                coverageLevel: 0,
+                llmProvider: 'anthropic',
+                checkDuplicates: false,
+                priorityFocus: '',
+                count: 5,
+                includeEdgeCases: false,
+                includeNegativeTests: true,
+                detailLevel: 'medium',
+              },
+              domainConfig: {
+                domain: 'ecommerce',
+                entity: '',
+                workflow: '',
+                includeBusinessRules: false,
+                includeEdgeCases: false,
+              },
+              testDataConfig: {
+                generateTestData: false,
+                placement: 0,
+                samplesPerCase: 0,
+              },
+            }),
+            testCaseCount: 5,
+            generationMethod: 'llm',
+            modelUsed: 'claude-3-sonnet',
+            generationTimeMs: 1500,
+            status: 'success',
+            errorMessage: '',
+            metadata: {},
+            createdAt: new Date(Date.now() - 3600000).toISOString(),
+            updatedAt: new Date(Date.now() - 3600000).toISOString(),
+          },
+          found: true,
+        };
+      }
+      return { found: false, session: undefined };
+    }
+
+    return grpcWebUnaryCall<GetHistorySessionRequest, GetHistorySessionResponse>(
+      GRPC_WEB_URL,
+      'testcases.v1.TestCasesService/GetHistorySession',
+      request,
+      GetHistorySessionRequestMsg.encode,
+      GetHistorySessionResponseMsg.decode
+    );
+  },
+
+  async deleteHistorySession(request: DeleteHistorySessionRequest): Promise<DeleteHistorySessionResponse> {
+    if (isMockMode()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return {
+        success: true,
+        message: `Session ${request.sessionId} deleted successfully`,
+      };
+    }
+
+    return grpcWebUnaryCall<DeleteHistorySessionRequest, DeleteHistorySessionResponse>(
+      GRPC_WEB_URL,
+      'testcases.v1.TestCasesService/DeleteHistorySession',
+      request,
+      DeleteHistorySessionRequestMsg.encode,
+      DeleteHistorySessionResponseMsg.decode
+    );
+  },
+};
+
+// Re-export types for convenience
+export type {
+  ListHistoryRequest,
+  ListHistoryResponse,
+  GetHistorySessionRequest,
+  GetHistorySessionResponse,
+  DeleteHistorySessionRequest,
+  DeleteHistorySessionResponse,
+  HistorySessionSummary,
+  HistorySession,
 };
 
 export default testCasesClient;

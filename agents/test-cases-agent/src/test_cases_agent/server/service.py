@@ -9,7 +9,7 @@ import grpc
 from google.protobuf import json_format
 
 from test_cases_agent.generation import get_generation_engine
-from test_cases_agent.knowledge import get_knowledge_retriever
+from test_cases_agent.knowledge import get_knowledge_retriever, get_history_repository
 from test_cases_agent.llm import LLMProviderType
 from test_cases_agent.models import TestCaseRequest, TestType, Priority
 from test_cases_agent.proto import test_cases_pb2, test_cases_pb2_grpc
@@ -29,6 +29,7 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
         self.logger = get_logger(__name__)
         self.generation_engine = get_generation_engine()
         self.knowledge_retriever = get_knowledge_retriever()
+        self.history_repository = get_history_repository()
         self.stored_test_cases: Dict[str, Any] = {}  # In-memory storage for now
         self.logger.info("TestCasesService initialized with all components")
 
@@ -63,11 +64,55 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
 
             # Convert to proto response
             proto_test_cases = []
+            test_cases_for_history = []
             for tc in generation_response.test_cases:
                 proto_tc = self._convert_to_proto_test_case(tc)
                 proto_test_cases.append(proto_tc)
                 # Store for later retrieval
                 self.stored_test_cases[proto_tc.id] = proto_tc
+                # Collect for history
+                test_cases_for_history.append({
+                    "id": tc.id,
+                    "title": tc.title,
+                    "description": tc.description,
+                    "test_type": tc.test_type,
+                    "priority": tc.priority,
+                    "preconditions": tc.preconditions,
+                    "postconditions": tc.postconditions,
+                    "expected_results": tc.expected_results,
+                    "steps": [{"step_number": s.step_number, "action": s.action, "expected_result": s.expected_result} for s in tc.steps],
+                    "tags": tc.metadata.tags if tc.metadata else [],
+                })
+
+            # Extract user story and acceptance criteria for history
+            user_story = ""
+            acceptance_criteria = []
+            if proto_request.HasField("user_story"):
+                user_story = proto_request.user_story.story
+                acceptance_criteria = list(proto_request.user_story.acceptance_criteria)
+            elif proto_request.HasField("free_form"):
+                user_story = proto_request.free_form.requirement
+
+            # Determine test types
+            test_types = [self._proto_to_model_test_type(tt).value for tt in proto_request.generation_config.test_types] if proto_request.generation_config.test_types else ["functional"]
+
+            # Save to history (non-blocking, fire and forget)
+            try:
+                await self.history_repository.create_from_generation(
+                    user_story=user_story,
+                    acceptance_criteria=acceptance_criteria,
+                    test_cases=test_cases_for_history,
+                    domain=proto_request.domain_config.domain if proto_request.HasField("domain_config") else "",
+                    test_types=test_types,
+                    coverage_level=self._coverage_level_to_string(proto_request.generation_config.coverage_level),
+                    generation_method="llm",
+                    model_used=generation_response.llm_provider,
+                    generation_time_ms=int(generation_response.generation_time_ms),
+                    status="success" if generation_response.success else "failed",
+                    error_message="" if generation_response.success else generation_response.error,
+                )
+            except Exception as history_error:
+                self.logger.warning(f"Failed to save history: {history_error}")
 
             response = test_cases_pb2.GenerateTestCasesResponse(
                 request_id=request.request_id or f"req_{int(time.time())}",
@@ -339,6 +384,255 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
             version="1.0.0"
         )
 
+    # ============================================================
+    # History Operations
+    # ============================================================
+
+    async def ListHistory(
+        self,
+        request: test_cases_pb2.ListHistoryRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> test_cases_pb2.ListHistoryResponse:
+        """
+        List generation history sessions.
+
+        Args:
+            request: ListHistoryRequest with pagination and filters
+            context: gRPC context
+
+        Returns:
+            ListHistoryResponse with session summaries
+        """
+        start_time = time.time()
+        method = "ListHistory"
+        log_grpc_request(method, request)
+
+        try:
+            # Get limit and offset with defaults
+            limit = request.limit if request.limit > 0 else 20
+            offset = request.offset if request.offset >= 0 else 0
+            domain = request.domain if request.domain else None
+            status = request.status if request.status else None
+
+            # Fetch from repository
+            sessions = await self.history_repository.list(
+                limit=limit,
+                offset=offset,
+                domain=domain,
+                status=status,
+            )
+
+            # Get total count for pagination
+            total_count = await self.history_repository.count(
+                domain=domain,
+                status=status,
+            )
+
+            # Convert to proto summaries
+            proto_sessions = []
+            for session in sessions:
+                proto_sessions.append(test_cases_pb2.HistorySessionSummary(
+                    session_id=session.session_id,
+                    user_story_preview=session.get_preview(),
+                    domain=session.domain,
+                    test_types=session.test_types,
+                    coverage_level=session.coverage_level,
+                    test_case_count=session.test_case_count,
+                    status=session.status,
+                    created_at=session.created_at,
+                ))
+
+            response = test_cases_pb2.ListHistoryResponse(
+                sessions=proto_sessions,
+                total_count=total_count,
+            )
+
+            duration_ms = (time.time() - start_time) * 1000
+            log_grpc_response(method, response, duration_ms)
+            return response
+
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_grpc_error(method, e, duration_ms)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Error listing history: {str(e)}")
+            raise
+
+    async def GetHistorySession(
+        self,
+        request: test_cases_pb2.GetHistorySessionRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> test_cases_pb2.GetHistorySessionResponse:
+        """
+        Get a specific history session with full test cases.
+
+        Args:
+            request: GetHistorySessionRequest with session ID
+            context: gRPC context
+
+        Returns:
+            GetHistorySessionResponse with full session
+        """
+        start_time = time.time()
+        method = "GetHistorySession"
+        log_grpc_request(method, request)
+
+        try:
+            if not request.session_id:
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details("session_id is required")
+                return test_cases_pb2.GetHistorySessionResponse(found=False)
+
+            # Fetch from repository
+            session = await self.history_repository.get(request.session_id)
+
+            if not session:
+                response = test_cases_pb2.GetHistorySessionResponse(found=False)
+            else:
+                # Convert test cases from dict to proto
+                proto_test_cases = []
+                for tc_dict in session.generated_test_cases:
+                    proto_tc = self._dict_to_proto_test_case(tc_dict)
+                    proto_test_cases.append(proto_tc)
+
+                # Convert metadata to string map
+                metadata = {k: str(v) for k, v in session.metadata.items()}
+
+                proto_session = test_cases_pb2.HistorySession(
+                    session_id=session.session_id,
+                    user_story=session.user_story,
+                    acceptance_criteria=session.acceptance_criteria,
+                    domain=session.domain,
+                    test_types=session.test_types,
+                    coverage_level=session.coverage_level,
+                    test_cases=proto_test_cases,
+                    test_case_count=session.test_case_count,
+                    generation_method=session.generation_method,
+                    model_used=session.model_used,
+                    generation_time_ms=session.generation_time_ms,
+                    status=session.status,
+                    error_message=session.error_message,
+                    metadata=metadata,
+                    created_at=session.created_at,
+                    updated_at=session.updated_at,
+                )
+
+                response = test_cases_pb2.GetHistorySessionResponse(
+                    session=proto_session,
+                    found=True,
+                )
+
+            duration_ms = (time.time() - start_time) * 1000
+            log_grpc_response(method, response, duration_ms)
+            return response
+
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_grpc_error(method, e, duration_ms)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Error getting history session: {str(e)}")
+            raise
+
+    async def DeleteHistorySession(
+        self,
+        request: test_cases_pb2.DeleteHistorySessionRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> test_cases_pb2.DeleteHistorySessionResponse:
+        """
+        Delete a history session.
+
+        Args:
+            request: DeleteHistorySessionRequest with session ID
+            context: gRPC context
+
+        Returns:
+            DeleteHistorySessionResponse with status
+        """
+        start_time = time.time()
+        method = "DeleteHistorySession"
+        log_grpc_request(method, request)
+
+        try:
+            if not request.session_id:
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details("session_id is required")
+                return test_cases_pb2.DeleteHistorySessionResponse(
+                    success=False,
+                    message="session_id is required",
+                )
+
+            # Delete from repository
+            deleted = await self.history_repository.delete(request.session_id)
+
+            if deleted:
+                response = test_cases_pb2.DeleteHistorySessionResponse(
+                    success=True,
+                    message=f"Session {request.session_id} deleted successfully",
+                )
+            else:
+                response = test_cases_pb2.DeleteHistorySessionResponse(
+                    success=False,
+                    message=f"Session {request.session_id} not found",
+                )
+
+            duration_ms = (time.time() - start_time) * 1000
+            log_grpc_response(method, response, duration_ms)
+            return response
+
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_grpc_error(method, e, duration_ms)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Error deleting history session: {str(e)}")
+            raise
+
+    def _dict_to_proto_test_case(self, tc_dict: Dict[str, Any]) -> test_cases_pb2.TestCase:
+        """Convert a test case dictionary to proto TestCase."""
+        proto_steps = []
+        steps = tc_dict.get("steps", [])
+        if isinstance(steps, list):
+            for i, step in enumerate(steps):
+                if isinstance(step, dict):
+                    proto_steps.append(test_cases_pb2.TestStep(
+                        order=step.get("step_number", step.get("order", i + 1)),
+                        action=step.get("action", ""),
+                        expected_result=step.get("expected_result", ""),
+                        test_data=json.dumps(step.get("test_data", {})) if step.get("test_data") else "",
+                    ))
+
+        # Handle preconditions - could be string or list
+        preconditions = tc_dict.get("preconditions", [])
+        if isinstance(preconditions, str):
+            preconditions = preconditions.split("\n") if preconditions else []
+
+        # Handle postconditions - could be string or list
+        postconditions = tc_dict.get("postconditions", [])
+        if isinstance(postconditions, str):
+            postconditions = postconditions.split("\n") if postconditions else []
+
+        # Get test type and priority
+        test_type = tc_dict.get("test_type", "functional")
+        if isinstance(test_type, str):
+            test_type = self._model_to_proto_test_type(test_type)
+
+        priority = tc_dict.get("priority", "medium")
+        if isinstance(priority, str):
+            priority = self._model_to_proto_priority(priority)
+
+        return test_cases_pb2.TestCase(
+            id=tc_dict.get("id", ""),
+            title=tc_dict.get("title", ""),
+            description=tc_dict.get("description", ""),
+            type=test_type,
+            priority=priority,
+            status=test_cases_pb2.TestCaseStatus.DRAFT,
+            preconditions=preconditions,
+            steps=proto_steps,
+            postconditions=postconditions,
+            expected_result=tc_dict.get("expected_results", tc_dict.get("expected_result", "")),
+            tags=tc_dict.get("tags", []),
+        )
+
     def _build_test_case_request(self, proto_request: test_cases_pb2.GenerateTestCasesRequest) -> TestCaseRequest:
         """Convert proto request to internal TestCaseRequest."""
         # Determine requirement and entity type
@@ -455,3 +749,12 @@ class TestCasesService(test_cases_pb2_grpc.TestCasesServiceServicer):
             "low": test_cases_pb2.Priority.LOW,
         }
         return mapping.get(model_priority.lower(), test_cases_pb2.Priority.MEDIUM)
+
+    def _coverage_level_to_string(self, coverage_level: test_cases_pb2.CoverageLevel) -> str:
+        """Convert proto CoverageLevel to string."""
+        mapping = {
+            test_cases_pb2.CoverageLevel.QUICK: "minimal",
+            test_cases_pb2.CoverageLevel.STANDARD: "standard",
+            test_cases_pb2.CoverageLevel.EXHAUSTIVE: "comprehensive",
+        }
+        return mapping.get(coverage_level, "standard")

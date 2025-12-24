@@ -1,7 +1,7 @@
 """Weaviate vector database client for knowledge management."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -20,6 +20,7 @@ class WeaviateClient:
     TEST_CASES_SCHEMA = "TestCases"
     TEST_PATTERNS_SCHEMA = "TestPatterns"
     COVERAGE_PATTERNS_SCHEMA = "CoveragePatterns"
+    TEST_CASE_HISTORY_SCHEMA = "TestCaseHistory"
 
     def __init__(
         self,
@@ -99,6 +100,10 @@ class WeaviateClient:
             # Create CoveragePatterns schema if needed
             if self.COVERAGE_PATTERNS_SCHEMA not in existing_classes:
                 await self._create_coverage_patterns_schema()
+
+            # Create TestCaseHistory schema if needed
+            if self.TEST_CASE_HISTORY_SCHEMA not in existing_classes:
+                await self._create_test_case_history_schema()
 
             self.logger.info("All required schemas are ready")
 
@@ -204,6 +209,41 @@ class WeaviateClient:
         self._client.schema.create_class(schema)
         self.logger.info(f"Created {self.COVERAGE_PATTERNS_SCHEMA} schema")
 
+    async def _create_test_case_history_schema(self) -> None:
+        """Create TestCaseHistory schema for storing generated test case sessions."""
+        schema = {
+            "class": self.TEST_CASE_HISTORY_SCHEMA,
+            "description": "Stores test case generation history sessions",
+            "properties": [
+                {"name": "session_id", "dataType": ["text"], "description": "Unique session identifier"},
+                {"name": "user_story", "dataType": ["text"], "description": "Original user story input"},
+                {"name": "acceptance_criteria", "dataType": ["text"], "description": "Acceptance criteria (JSON array)"},
+                {"name": "domain", "dataType": ["text"], "description": "Domain context (e.g., ecommerce)"},
+                {"name": "test_types", "dataType": ["text[]"], "description": "Types of tests generated"},
+                {"name": "coverage_level", "dataType": ["text"], "description": "Coverage level (comprehensive, standard, minimal)"},
+                {"name": "generated_test_cases", "dataType": ["text"], "description": "Generated test cases (JSON string)"},
+                {"name": "test_case_count", "dataType": ["int"], "description": "Number of test cases generated"},
+                {"name": "generation_method", "dataType": ["text"], "description": "Method used (llm, hybrid, etc.)"},
+                {"name": "model_used", "dataType": ["text"], "description": "LLM model used for generation"},
+                {"name": "generation_time_ms", "dataType": ["int"], "description": "Time taken to generate in milliseconds"},
+                {"name": "status", "dataType": ["text"], "description": "Generation status (success, partial, failed)"},
+                {"name": "error_message", "dataType": ["text"], "description": "Error message if failed"},
+                {"name": "metadata", "dataType": ["text"], "description": "Additional metadata (JSON string)"},
+                {"name": "created_at", "dataType": ["date"], "description": "When the session was created"},
+                {"name": "updated_at", "dataType": ["date"], "description": "When the session was last updated"},
+            ],
+            "vectorizer": "text2vec-openai",
+            "moduleConfig": {
+                "text2vec-openai": {
+                    "model": "ada-002",
+                    "type": "text",
+                }
+            },
+        }
+
+        self._client.schema.create_class(schema)
+        self.logger.info(f"Created {self.TEST_CASE_HISTORY_SCHEMA} schema")
+
     async def store_test_case(
         self,
         test_case: Dict[str, Any],
@@ -238,8 +278,8 @@ class WeaviateClient:
                 "postconditions": test_case.get("postconditions", []),
                 "test_data": json.dumps(test_case.get("test_data", {})),
                 "tags": test_case.get("tags", []),
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
                 "coverage_score": test_case.get("coverage_score", 0.0),
                 "complexity_score": test_case.get("complexity_score", 0.0),
                 "domain_context": json.dumps(test_case.get("domain_context", {})),
@@ -461,6 +501,319 @@ class WeaviateClient:
 
         except Exception as e:
             self.logger.error(f"Failed to update pattern usage: {e}")
+
+    # ============================================================
+    # Test Case History Methods
+    # ============================================================
+
+    async def store_test_case_history(
+        self,
+        session_data: Dict[str, Any],
+    ) -> str:
+        """
+        Store a test case generation session in history.
+
+        Args:
+            session_data: Session data including user_story, test_cases, etc.
+
+        Returns:
+            UUID of stored session
+        """
+        if not self._client:
+            await self.connect()
+
+        try:
+            session_id = session_data.get("session_id", str(uuid4()))
+            now = datetime.now(timezone.utc).isoformat()
+
+            # Prepare data for storage
+            data = {
+                "session_id": session_id,
+                "user_story": session_data.get("user_story", ""),
+                "acceptance_criteria": json.dumps(session_data.get("acceptance_criteria", [])),
+                "domain": session_data.get("domain", ""),
+                "test_types": session_data.get("test_types", []),
+                "coverage_level": session_data.get("coverage_level", "standard"),
+                "generated_test_cases": json.dumps(session_data.get("generated_test_cases", [])),
+                "test_case_count": session_data.get("test_case_count", 0),
+                "generation_method": session_data.get("generation_method", "llm"),
+                "model_used": session_data.get("model_used", ""),
+                "generation_time_ms": session_data.get("generation_time_ms", 0),
+                "status": session_data.get("status", "success"),
+                "error_message": session_data.get("error_message", ""),
+                "metadata": json.dumps(session_data.get("metadata", {})),
+                "created_at": session_data.get("created_at", now),
+                "updated_at": now,
+            }
+
+            # Store in Weaviate
+            result = self._client.data_object.create(
+                data_object=data,
+                class_name=self.TEST_CASE_HISTORY_SCHEMA,
+            )
+
+            self.logger.info(f"Stored test case history session with ID: {result}")
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Failed to store test case history: {e}")
+            raise
+
+    async def list_test_case_history(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        domain: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        List test case generation history sessions.
+
+        Args:
+            limit: Maximum number of results
+            offset: Number of results to skip
+            domain: Optional filter by domain
+            status: Optional filter by status
+
+        Returns:
+            List of history sessions (sorted by created_at descending)
+        """
+        if not self._client:
+            await self.connect()
+
+        try:
+            return_fields = [
+                "session_id", "user_story", "acceptance_criteria", "domain",
+                "test_types", "coverage_level", "test_case_count",
+                "generation_method", "model_used", "generation_time_ms",
+                "status", "error_message", "created_at", "updated_at"
+            ]
+
+            # Build query
+            weaviate_query = (
+                self._client.query
+                .get(self.TEST_CASE_HISTORY_SCHEMA, return_fields)
+                .with_additional(["id"])
+                .with_limit(limit)
+                .with_offset(offset)
+            )
+
+            # Add filters if provided
+            filters = {}
+            if domain:
+                filters["domain"] = domain
+            if status:
+                filters["status"] = status
+
+            if filters:
+                where_filter = self._build_where_filter(filters)
+                weaviate_query = weaviate_query.with_where(where_filter)
+
+            # Execute query
+            result = weaviate_query.do()
+
+            # Extract results
+            sessions = result.get("data", {}).get("Get", {}).get(
+                self.TEST_CASE_HISTORY_SCHEMA, []
+            )
+
+            # Parse JSON fields and add weaviate_id
+            for session in sessions:
+                if "acceptance_criteria" in session and session["acceptance_criteria"]:
+                    try:
+                        session["acceptance_criteria"] = json.loads(session["acceptance_criteria"])
+                    except json.JSONDecodeError:
+                        session["acceptance_criteria"] = []
+
+                # Add weaviate_id from additional
+                additional = session.pop("_additional", {})
+                session["weaviate_id"] = additional.get("id", "")
+
+            # Sort by created_at descending (newest first)
+            sessions.sort(
+                key=lambda x: x.get("created_at", ""),
+                reverse=True
+            )
+
+            return sessions
+
+        except Exception as e:
+            self.logger.error(f"Failed to list test case history: {e}")
+            raise
+
+    async def get_test_case_history(
+        self,
+        session_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific test case history session by ID.
+
+        Args:
+            session_id: The session ID to retrieve
+
+        Returns:
+            Session data or None if not found
+        """
+        if not self._client:
+            await self.connect()
+
+        try:
+            return_fields = [
+                "session_id", "user_story", "acceptance_criteria", "domain",
+                "test_types", "coverage_level", "generated_test_cases",
+                "test_case_count", "generation_method", "model_used",
+                "generation_time_ms", "status", "error_message",
+                "metadata", "created_at", "updated_at"
+            ]
+
+            where_filter = {
+                "path": ["session_id"],
+                "operator": "Equal",
+                "valueString": session_id,
+            }
+
+            result = (
+                self._client.query
+                .get(self.TEST_CASE_HISTORY_SCHEMA, return_fields)
+                .with_additional(["id"])
+                .with_where(where_filter)
+                .with_limit(1)
+                .do()
+            )
+
+            sessions = result.get("data", {}).get("Get", {}).get(
+                self.TEST_CASE_HISTORY_SCHEMA, []
+            )
+
+            if not sessions:
+                return None
+
+            session = sessions[0]
+
+            # Parse JSON fields
+            for field in ["acceptance_criteria", "generated_test_cases", "metadata"]:
+                if field in session and session[field]:
+                    try:
+                        session[field] = json.loads(session[field])
+                    except json.JSONDecodeError:
+                        session[field] = [] if field != "metadata" else {}
+
+            # Add weaviate_id from additional
+            additional = session.pop("_additional", {})
+            session["weaviate_id"] = additional.get("id", "")
+
+            return session
+
+        except Exception as e:
+            self.logger.error(f"Failed to get test case history: {e}")
+            raise
+
+    async def delete_test_case_history(
+        self,
+        session_id: str,
+    ) -> bool:
+        """
+        Delete a test case history session.
+
+        Args:
+            session_id: The session ID to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        if not self._client:
+            await self.connect()
+
+        try:
+            # First find the weaviate ID
+            where_filter = {
+                "path": ["session_id"],
+                "operator": "Equal",
+                "valueString": session_id,
+            }
+
+            result = (
+                self._client.query
+                .get(self.TEST_CASE_HISTORY_SCHEMA, ["session_id"])
+                .with_additional(["id"])
+                .with_where(where_filter)
+                .with_limit(1)
+                .do()
+            )
+
+            sessions = result.get("data", {}).get("Get", {}).get(
+                self.TEST_CASE_HISTORY_SCHEMA, []
+            )
+
+            if not sessions:
+                self.logger.warning(f"History session {session_id} not found for deletion")
+                return False
+
+            weaviate_id = sessions[0].get("_additional", {}).get("id")
+            if not weaviate_id:
+                self.logger.error(f"Could not get Weaviate ID for session {session_id}")
+                return False
+
+            # Delete by Weaviate ID
+            self._client.data_object.delete(
+                uuid=weaviate_id,
+                class_name=self.TEST_CASE_HISTORY_SCHEMA,
+            )
+
+            self.logger.info(f"Deleted test case history session: {session_id}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to delete test case history: {e}")
+            raise
+
+    async def count_test_case_history(
+        self,
+        domain: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> int:
+        """
+        Count total test case history sessions.
+
+        Args:
+            domain: Optional filter by domain
+            status: Optional filter by status
+
+        Returns:
+            Total count of sessions
+        """
+        if not self._client:
+            await self.connect()
+
+        try:
+            query = (
+                self._client.query
+                .aggregate(self.TEST_CASE_HISTORY_SCHEMA)
+                .with_meta_count()
+            )
+
+            # Add filters if provided
+            filters = {}
+            if domain:
+                filters["domain"] = domain
+            if status:
+                filters["status"] = status
+
+            if filters:
+                where_filter = self._build_where_filter(filters)
+                query = query.with_where(where_filter)
+
+            result = query.do()
+
+            count = result.get("data", {}).get("Aggregate", {}).get(
+                self.TEST_CASE_HISTORY_SCHEMA, [{}]
+            )[0].get("meta", {}).get("count", 0)
+
+            return count
+
+        except Exception as e:
+            self.logger.error(f"Failed to count test case history: {e}")
+            return 0
 
     def _build_where_filter(self, filters: Dict[str, Any]) -> Dict[str, Any]:
         """

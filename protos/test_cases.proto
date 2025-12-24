@@ -5,21 +5,32 @@ package testcases.v1;
 service TestCasesService {
   // Generate test cases from requirements
   rpc GenerateTestCases(GenerateTestCasesRequest) returns (GenerateTestCasesResponse);
-  
+
   // Get a specific test case by ID
   rpc GetTestCase(GetTestCaseRequest) returns (GetTestCaseResponse);
-  
+
   // List historical test cases
   rpc ListTestCases(ListTestCasesRequest) returns (ListTestCasesResponse);
-  
+
   // Store test cases (for learning)
   rpc StoreTestCases(StoreTestCasesRequest) returns (StoreTestCasesResponse);
-  
+
   // Get coverage analysis for requirements
   rpc AnalyzeCoverage(AnalyzeCoverageRequest) returns (AnalyzeCoverageResponse);
-  
+
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // ============ History Operations ============
+
+  // List generation history sessions
+  rpc ListHistory(ListHistoryRequest) returns (ListHistoryResponse);
+
+  // Get a specific history session with full test cases
+  rpc GetHistorySession(GetHistorySessionRequest) returns (GetHistorySessionResponse);
+
+  // Delete a history session
+  rpc DeleteHistorySession(DeleteHistorySessionRequest) returns (DeleteHistorySessionResponse);
 }
 
 // ============ Generate Test Cases ============
@@ -332,4 +343,74 @@ message HealthCheckResponse {
   HealthCheckStatus status = 1;             // Service status enum
   string version = 2;                       // Service version
   map<string, string> components = 3;       // Component status
+}
+
+// ============ History ============
+
+// History session summary (for list view)
+message HistorySessionSummary {
+  string session_id = 1;                    // Unique session identifier
+  string user_story_preview = 2;            // First 100 chars of user story
+  string domain = 3;                        // Domain context (e.g., ecommerce)
+  repeated string test_types = 4;           // Types of tests generated
+  string coverage_level = 5;                // comprehensive, standard, minimal
+  int32 test_case_count = 6;                // Number of test cases generated
+  string status = 7;                        // success, partial, failed
+  string created_at = 8;                    // ISO timestamp
+}
+
+// Full history session with test cases
+message HistorySession {
+  string session_id = 1;                    // Unique session identifier
+  string user_story = 2;                    // Full user story
+  repeated string acceptance_criteria = 3;  // Acceptance criteria
+  string domain = 4;                        // Domain context
+  repeated string test_types = 5;           // Types of tests generated
+  string coverage_level = 6;                // Coverage level used
+  repeated TestCase test_cases = 7;         // Generated test cases
+  int32 test_case_count = 8;                // Number of test cases
+  string generation_method = 9;             // llm, hybrid, etc.
+  string model_used = 10;                   // LLM model used
+  int32 generation_time_ms = 11;            // Time taken in milliseconds
+  string status = 12;                       // success, partial, failed
+  string error_message = 13;                // Error message if failed
+  map<string, string> metadata = 14;        // Additional metadata
+  string created_at = 15;                   // ISO timestamp
+  string updated_at = 16;                   // ISO timestamp
+}
+
+// List history request
+message ListHistoryRequest {
+  int32 limit = 1;                          // Max results (default 20)
+  int32 offset = 2;                         // Pagination offset
+  string domain = 3;                        // Optional filter by domain
+  string status = 4;                        // Optional filter by status
+}
+
+// List history response
+message ListHistoryResponse {
+  repeated HistorySessionSummary sessions = 1;  // List of session summaries
+  int32 total_count = 2;                    // Total count for pagination
+}
+
+// Get history session request
+message GetHistorySessionRequest {
+  string session_id = 1;                    // Session ID to retrieve
+}
+
+// Get history session response
+message GetHistorySessionResponse {
+  HistorySession session = 1;               // Full session with test cases
+  bool found = 2;                           // Whether the session was found
+}
+
+// Delete history session request
+message DeleteHistorySessionRequest {
+  string session_id = 1;                    // Session ID to delete
+}
+
+// Delete history session response
+message DeleteHistorySessionResponse {
+  bool success = 1;                         // Whether deletion was successful
+  string message = 2;                       // Status message
 }

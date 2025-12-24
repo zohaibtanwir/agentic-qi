@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
 # Load .env file from the root qa-platform folder
@@ -42,6 +42,13 @@ class LLMProvider(str, Enum):
 
 class Settings(BaseSettings):
     """Application settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
     # Service Configuration
     service_name: str = Field(default="test-cases-agent", description="Service name")
@@ -117,14 +124,6 @@ class Settings(BaseSettings):
     def has_anthropic(self) -> bool:
         """Check if Anthropic is configured."""
         return bool(self.anthropic_api_key)
-
-    class Config:
-        """Pydantic config."""
-
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        extra = "ignore"
 
 
 # Global settings instance

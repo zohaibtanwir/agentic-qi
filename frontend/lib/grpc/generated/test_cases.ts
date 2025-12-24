@@ -784,6 +784,117 @@ export interface HealthCheckResponse_ComponentsEntry {
   value: string;
 }
 
+/** History session summary (for list view) */
+export interface HistorySessionSummary {
+  /** Unique session identifier */
+  sessionId: string;
+  /** First 100 chars of user story */
+  userStoryPreview: string;
+  /** Domain context (e.g., ecommerce) */
+  domain: string;
+  /** Types of tests generated */
+  testTypes: string[];
+  /** comprehensive, standard, minimal */
+  coverageLevel: string;
+  /** Number of test cases generated */
+  testCaseCount: number;
+  /** success, partial, failed */
+  status: string;
+  /** ISO timestamp */
+  createdAt: string;
+}
+
+/** Full history session with test cases */
+export interface HistorySession {
+  /** Unique session identifier */
+  sessionId: string;
+  /** Full user story */
+  userStory: string;
+  /** Acceptance criteria */
+  acceptanceCriteria: string[];
+  /** Domain context */
+  domain: string;
+  /** Types of tests generated */
+  testTypes: string[];
+  /** Coverage level used */
+  coverageLevel: string;
+  /** Generated test cases */
+  testCases: TestCase[];
+  /** Number of test cases */
+  testCaseCount: number;
+  /** llm, hybrid, etc. */
+  generationMethod: string;
+  /** LLM model used */
+  modelUsed: string;
+  /** Time taken in milliseconds */
+  generationTimeMs: number;
+  /** success, partial, failed */
+  status: string;
+  /** Error message if failed */
+  errorMessage: string;
+  /** Additional metadata */
+  metadata: { [key: string]: string };
+  /** ISO timestamp */
+  createdAt: string;
+  /** ISO timestamp */
+  updatedAt: string;
+}
+
+export interface HistorySession_MetadataEntry {
+  key: string;
+  value: string;
+}
+
+/** List history request */
+export interface ListHistoryRequest {
+  /** Max results (default 20) */
+  limit: number;
+  /** Pagination offset */
+  offset: number;
+  /** Optional filter by domain */
+  domain: string;
+  /** Optional filter by status */
+  status: string;
+}
+
+/** List history response */
+export interface ListHistoryResponse {
+  /** List of session summaries */
+  sessions: HistorySessionSummary[];
+  /** Total count for pagination */
+  totalCount: number;
+}
+
+/** Get history session request */
+export interface GetHistorySessionRequest {
+  /** Session ID to retrieve */
+  sessionId: string;
+}
+
+/** Get history session response */
+export interface GetHistorySessionResponse {
+  /** Full session with test cases */
+  session:
+    | HistorySession
+    | undefined;
+  /** Whether the session was found */
+  found: boolean;
+}
+
+/** Delete history session request */
+export interface DeleteHistorySessionRequest {
+  /** Session ID to delete */
+  sessionId: string;
+}
+
+/** Delete history session response */
+export interface DeleteHistorySessionResponse {
+  /** Whether deletion was successful */
+  success: boolean;
+  /** Status message */
+  message: string;
+}
+
 function createBaseGenerateTestCasesRequest(): GenerateTestCasesRequest {
   return {
     requestId: "",
@@ -4266,6 +4377,1063 @@ export const HealthCheckResponse_ComponentsEntry: MessageFns<HealthCheckResponse
   },
 };
 
+function createBaseHistorySessionSummary(): HistorySessionSummary {
+  return {
+    sessionId: "",
+    userStoryPreview: "",
+    domain: "",
+    testTypes: [],
+    coverageLevel: "",
+    testCaseCount: 0,
+    status: "",
+    createdAt: "",
+  };
+}
+
+export const HistorySessionSummary: MessageFns<HistorySessionSummary> = {
+  encode(message: HistorySessionSummary, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionId !== "") {
+      writer.uint32(10).string(message.sessionId);
+    }
+    if (message.userStoryPreview !== "") {
+      writer.uint32(18).string(message.userStoryPreview);
+    }
+    if (message.domain !== "") {
+      writer.uint32(26).string(message.domain);
+    }
+    for (const v of message.testTypes) {
+      writer.uint32(34).string(v!);
+    }
+    if (message.coverageLevel !== "") {
+      writer.uint32(42).string(message.coverageLevel);
+    }
+    if (message.testCaseCount !== 0) {
+      writer.uint32(48).int32(message.testCaseCount);
+    }
+    if (message.status !== "") {
+      writer.uint32(58).string(message.status);
+    }
+    if (message.createdAt !== "") {
+      writer.uint32(66).string(message.createdAt);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): HistorySessionSummary {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseHistorySessionSummary();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userStoryPreview = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.domain = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.testTypes.push(reader.string());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.coverageLevel = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.testCaseCount = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.createdAt = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): HistorySessionSummary {
+    return {
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+      userStoryPreview: isSet(object.userStoryPreview) ? globalThis.String(object.userStoryPreview) : "",
+      domain: isSet(object.domain) ? globalThis.String(object.domain) : "",
+      testTypes: globalThis.Array.isArray(object?.testTypes)
+        ? object.testTypes.map((e: any) => globalThis.String(e))
+        : [],
+      coverageLevel: isSet(object.coverageLevel) ? globalThis.String(object.coverageLevel) : "",
+      testCaseCount: isSet(object.testCaseCount) ? globalThis.Number(object.testCaseCount) : 0,
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      createdAt: isSet(object.createdAt) ? globalThis.String(object.createdAt) : "",
+    };
+  },
+
+  toJSON(message: HistorySessionSummary): unknown {
+    const obj: any = {};
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.userStoryPreview !== "") {
+      obj.userStoryPreview = message.userStoryPreview;
+    }
+    if (message.domain !== "") {
+      obj.domain = message.domain;
+    }
+    if (message.testTypes?.length) {
+      obj.testTypes = message.testTypes;
+    }
+    if (message.coverageLevel !== "") {
+      obj.coverageLevel = message.coverageLevel;
+    }
+    if (message.testCaseCount !== 0) {
+      obj.testCaseCount = Math.round(message.testCaseCount);
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.createdAt !== "") {
+      obj.createdAt = message.createdAt;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<HistorySessionSummary>): HistorySessionSummary {
+    return HistorySessionSummary.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<HistorySessionSummary>): HistorySessionSummary {
+    const message = createBaseHistorySessionSummary();
+    message.sessionId = object.sessionId ?? "";
+    message.userStoryPreview = object.userStoryPreview ?? "";
+    message.domain = object.domain ?? "";
+    message.testTypes = object.testTypes?.map((e) => e) || [];
+    message.coverageLevel = object.coverageLevel ?? "";
+    message.testCaseCount = object.testCaseCount ?? 0;
+    message.status = object.status ?? "";
+    message.createdAt = object.createdAt ?? "";
+    return message;
+  },
+};
+
+function createBaseHistorySession(): HistorySession {
+  return {
+    sessionId: "",
+    userStory: "",
+    acceptanceCriteria: [],
+    domain: "",
+    testTypes: [],
+    coverageLevel: "",
+    testCases: [],
+    testCaseCount: 0,
+    generationMethod: "",
+    modelUsed: "",
+    generationTimeMs: 0,
+    status: "",
+    errorMessage: "",
+    metadata: {},
+    createdAt: "",
+    updatedAt: "",
+  };
+}
+
+export const HistorySession: MessageFns<HistorySession> = {
+  encode(message: HistorySession, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionId !== "") {
+      writer.uint32(10).string(message.sessionId);
+    }
+    if (message.userStory !== "") {
+      writer.uint32(18).string(message.userStory);
+    }
+    for (const v of message.acceptanceCriteria) {
+      writer.uint32(26).string(v!);
+    }
+    if (message.domain !== "") {
+      writer.uint32(34).string(message.domain);
+    }
+    for (const v of message.testTypes) {
+      writer.uint32(42).string(v!);
+    }
+    if (message.coverageLevel !== "") {
+      writer.uint32(50).string(message.coverageLevel);
+    }
+    for (const v of message.testCases) {
+      TestCase.encode(v!, writer.uint32(58).fork()).join();
+    }
+    if (message.testCaseCount !== 0) {
+      writer.uint32(64).int32(message.testCaseCount);
+    }
+    if (message.generationMethod !== "") {
+      writer.uint32(74).string(message.generationMethod);
+    }
+    if (message.modelUsed !== "") {
+      writer.uint32(82).string(message.modelUsed);
+    }
+    if (message.generationTimeMs !== 0) {
+      writer.uint32(88).int32(message.generationTimeMs);
+    }
+    if (message.status !== "") {
+      writer.uint32(98).string(message.status);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(106).string(message.errorMessage);
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      HistorySession_MetadataEntry.encode({ key: key as any, value }, writer.uint32(114).fork()).join();
+    });
+    if (message.createdAt !== "") {
+      writer.uint32(122).string(message.createdAt);
+    }
+    if (message.updatedAt !== "") {
+      writer.uint32(130).string(message.updatedAt);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): HistorySession {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseHistorySession();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userStory = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.acceptanceCriteria.push(reader.string());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.domain = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.testTypes.push(reader.string());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.coverageLevel = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.testCases.push(TestCase.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.testCaseCount = reader.int32();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.generationMethod = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.modelUsed = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.generationTimeMs = reader.int32();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          const entry14 = HistorySession_MetadataEntry.decode(reader, reader.uint32());
+          if (entry14.value !== undefined) {
+            message.metadata[entry14.key] = entry14.value;
+          }
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.createdAt = reader.string();
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.updatedAt = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): HistorySession {
+    return {
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+      userStory: isSet(object.userStory) ? globalThis.String(object.userStory) : "",
+      acceptanceCriteria: globalThis.Array.isArray(object?.acceptanceCriteria)
+        ? object.acceptanceCriteria.map((e: any) => globalThis.String(e))
+        : [],
+      domain: isSet(object.domain) ? globalThis.String(object.domain) : "",
+      testTypes: globalThis.Array.isArray(object?.testTypes)
+        ? object.testTypes.map((e: any) => globalThis.String(e))
+        : [],
+      coverageLevel: isSet(object.coverageLevel) ? globalThis.String(object.coverageLevel) : "",
+      testCases: globalThis.Array.isArray(object?.testCases)
+        ? object.testCases.map((e: any) => TestCase.fromJSON(e))
+        : [],
+      testCaseCount: isSet(object.testCaseCount) ? globalThis.Number(object.testCaseCount) : 0,
+      generationMethod: isSet(object.generationMethod) ? globalThis.String(object.generationMethod) : "",
+      modelUsed: isSet(object.modelUsed) ? globalThis.String(object.modelUsed) : "",
+      generationTimeMs: isSet(object.generationTimeMs) ? globalThis.Number(object.generationTimeMs) : 0,
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+      createdAt: isSet(object.createdAt) ? globalThis.String(object.createdAt) : "",
+      updatedAt: isSet(object.updatedAt) ? globalThis.String(object.updatedAt) : "",
+    };
+  },
+
+  toJSON(message: HistorySession): unknown {
+    const obj: any = {};
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.userStory !== "") {
+      obj.userStory = message.userStory;
+    }
+    if (message.acceptanceCriteria?.length) {
+      obj.acceptanceCriteria = message.acceptanceCriteria;
+    }
+    if (message.domain !== "") {
+      obj.domain = message.domain;
+    }
+    if (message.testTypes?.length) {
+      obj.testTypes = message.testTypes;
+    }
+    if (message.coverageLevel !== "") {
+      obj.coverageLevel = message.coverageLevel;
+    }
+    if (message.testCases?.length) {
+      obj.testCases = message.testCases.map((e) => TestCase.toJSON(e));
+    }
+    if (message.testCaseCount !== 0) {
+      obj.testCaseCount = Math.round(message.testCaseCount);
+    }
+    if (message.generationMethod !== "") {
+      obj.generationMethod = message.generationMethod;
+    }
+    if (message.modelUsed !== "") {
+      obj.modelUsed = message.modelUsed;
+    }
+    if (message.generationTimeMs !== 0) {
+      obj.generationTimeMs = Math.round(message.generationTimeMs);
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    if (message.createdAt !== "") {
+      obj.createdAt = message.createdAt;
+    }
+    if (message.updatedAt !== "") {
+      obj.updatedAt = message.updatedAt;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<HistorySession>): HistorySession {
+    return HistorySession.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<HistorySession>): HistorySession {
+    const message = createBaseHistorySession();
+    message.sessionId = object.sessionId ?? "";
+    message.userStory = object.userStory ?? "";
+    message.acceptanceCriteria = object.acceptanceCriteria?.map((e) => e) || [];
+    message.domain = object.domain ?? "";
+    message.testTypes = object.testTypes?.map((e) => e) || [];
+    message.coverageLevel = object.coverageLevel ?? "";
+    message.testCases = object.testCases?.map((e) => TestCase.fromPartial(e)) || [];
+    message.testCaseCount = object.testCaseCount ?? 0;
+    message.generationMethod = object.generationMethod ?? "";
+    message.modelUsed = object.modelUsed ?? "";
+    message.generationTimeMs = object.generationTimeMs ?? 0;
+    message.status = object.status ?? "";
+    message.errorMessage = object.errorMessage ?? "";
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    message.createdAt = object.createdAt ?? "";
+    message.updatedAt = object.updatedAt ?? "";
+    return message;
+  },
+};
+
+function createBaseHistorySession_MetadataEntry(): HistorySession_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const HistorySession_MetadataEntry: MessageFns<HistorySession_MetadataEntry> = {
+  encode(message: HistorySession_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): HistorySession_MetadataEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseHistorySession_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): HistorySession_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: HistorySession_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<HistorySession_MetadataEntry>): HistorySession_MetadataEntry {
+    return HistorySession_MetadataEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<HistorySession_MetadataEntry>): HistorySession_MetadataEntry {
+    const message = createBaseHistorySession_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseListHistoryRequest(): ListHistoryRequest {
+  return { limit: 0, offset: 0, domain: "", status: "" };
+}
+
+export const ListHistoryRequest: MessageFns<ListHistoryRequest> = {
+  encode(message: ListHistoryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.limit !== 0) {
+      writer.uint32(8).int32(message.limit);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(16).int32(message.offset);
+    }
+    if (message.domain !== "") {
+      writer.uint32(26).string(message.domain);
+    }
+    if (message.status !== "") {
+      writer.uint32(34).string(message.status);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListHistoryRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListHistoryRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.limit = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.domain = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListHistoryRequest {
+    return {
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+      domain: isSet(object.domain) ? globalThis.String(object.domain) : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+    };
+  },
+
+  toJSON(message: ListHistoryRequest): unknown {
+    const obj: any = {};
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    if (message.domain !== "") {
+      obj.domain = message.domain;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListHistoryRequest>): ListHistoryRequest {
+    return ListHistoryRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListHistoryRequest>): ListHistoryRequest {
+    const message = createBaseListHistoryRequest();
+    message.limit = object.limit ?? 0;
+    message.offset = object.offset ?? 0;
+    message.domain = object.domain ?? "";
+    message.status = object.status ?? "";
+    return message;
+  },
+};
+
+function createBaseListHistoryResponse(): ListHistoryResponse {
+  return { sessions: [], totalCount: 0 };
+}
+
+export const ListHistoryResponse: MessageFns<ListHistoryResponse> = {
+  encode(message: ListHistoryResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.sessions) {
+      HistorySessionSummary.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.totalCount !== 0) {
+      writer.uint32(16).int32(message.totalCount);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListHistoryResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListHistoryResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessions.push(HistorySessionSummary.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.totalCount = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListHistoryResponse {
+    return {
+      sessions: globalThis.Array.isArray(object?.sessions)
+        ? object.sessions.map((e: any) => HistorySessionSummary.fromJSON(e))
+        : [],
+      totalCount: isSet(object.totalCount) ? globalThis.Number(object.totalCount) : 0,
+    };
+  },
+
+  toJSON(message: ListHistoryResponse): unknown {
+    const obj: any = {};
+    if (message.sessions?.length) {
+      obj.sessions = message.sessions.map((e) => HistorySessionSummary.toJSON(e));
+    }
+    if (message.totalCount !== 0) {
+      obj.totalCount = Math.round(message.totalCount);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListHistoryResponse>): ListHistoryResponse {
+    return ListHistoryResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListHistoryResponse>): ListHistoryResponse {
+    const message = createBaseListHistoryResponse();
+    message.sessions = object.sessions?.map((e) => HistorySessionSummary.fromPartial(e)) || [];
+    message.totalCount = object.totalCount ?? 0;
+    return message;
+  },
+};
+
+function createBaseGetHistorySessionRequest(): GetHistorySessionRequest {
+  return { sessionId: "" };
+}
+
+export const GetHistorySessionRequest: MessageFns<GetHistorySessionRequest> = {
+  encode(message: GetHistorySessionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionId !== "") {
+      writer.uint32(10).string(message.sessionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetHistorySessionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetHistorySessionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetHistorySessionRequest {
+    return { sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "" };
+  },
+
+  toJSON(message: GetHistorySessionRequest): unknown {
+    const obj: any = {};
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetHistorySessionRequest>): GetHistorySessionRequest {
+    return GetHistorySessionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetHistorySessionRequest>): GetHistorySessionRequest {
+    const message = createBaseGetHistorySessionRequest();
+    message.sessionId = object.sessionId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetHistorySessionResponse(): GetHistorySessionResponse {
+  return { session: undefined, found: false };
+}
+
+export const GetHistorySessionResponse: MessageFns<GetHistorySessionResponse> = {
+  encode(message: GetHistorySessionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.session !== undefined) {
+      HistorySession.encode(message.session, writer.uint32(10).fork()).join();
+    }
+    if (message.found !== false) {
+      writer.uint32(16).bool(message.found);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetHistorySessionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetHistorySessionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.session = HistorySession.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.found = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetHistorySessionResponse {
+    return {
+      session: isSet(object.session) ? HistorySession.fromJSON(object.session) : undefined,
+      found: isSet(object.found) ? globalThis.Boolean(object.found) : false,
+    };
+  },
+
+  toJSON(message: GetHistorySessionResponse): unknown {
+    const obj: any = {};
+    if (message.session !== undefined) {
+      obj.session = HistorySession.toJSON(message.session);
+    }
+    if (message.found !== false) {
+      obj.found = message.found;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetHistorySessionResponse>): GetHistorySessionResponse {
+    return GetHistorySessionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetHistorySessionResponse>): GetHistorySessionResponse {
+    const message = createBaseGetHistorySessionResponse();
+    message.session = (object.session !== undefined && object.session !== null)
+      ? HistorySession.fromPartial(object.session)
+      : undefined;
+    message.found = object.found ?? false;
+    return message;
+  },
+};
+
+function createBaseDeleteHistorySessionRequest(): DeleteHistorySessionRequest {
+  return { sessionId: "" };
+}
+
+export const DeleteHistorySessionRequest: MessageFns<DeleteHistorySessionRequest> = {
+  encode(message: DeleteHistorySessionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionId !== "") {
+      writer.uint32(10).string(message.sessionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteHistorySessionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteHistorySessionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteHistorySessionRequest {
+    return { sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "" };
+  },
+
+  toJSON(message: DeleteHistorySessionRequest): unknown {
+    const obj: any = {};
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteHistorySessionRequest>): DeleteHistorySessionRequest {
+    return DeleteHistorySessionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteHistorySessionRequest>): DeleteHistorySessionRequest {
+    const message = createBaseDeleteHistorySessionRequest();
+    message.sessionId = object.sessionId ?? "";
+    return message;
+  },
+};
+
+function createBaseDeleteHistorySessionResponse(): DeleteHistorySessionResponse {
+  return { success: false, message: "" };
+}
+
+export const DeleteHistorySessionResponse: MessageFns<DeleteHistorySessionResponse> = {
+  encode(message: DeleteHistorySessionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.message !== "") {
+      writer.uint32(18).string(message.message);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteHistorySessionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteHistorySessionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.message = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteHistorySessionResponse {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      message: isSet(object.message) ? globalThis.String(object.message) : "",
+    };
+  },
+
+  toJSON(message: DeleteHistorySessionResponse): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.message !== "") {
+      obj.message = message.message;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteHistorySessionResponse>): DeleteHistorySessionResponse {
+    return DeleteHistorySessionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteHistorySessionResponse>): DeleteHistorySessionResponse {
+    const message = createBaseDeleteHistorySessionResponse();
+    message.success = object.success ?? false;
+    message.message = object.message ?? "";
+    return message;
+  },
+};
+
 export type TestCasesServiceDefinition = typeof TestCasesServiceDefinition;
 export const TestCasesServiceDefinition = {
   name: "TestCasesService",
@@ -4325,6 +5493,33 @@ export const TestCasesServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** List generation history sessions */
+    listHistory: {
+      name: "ListHistory",
+      requestType: ListHistoryRequest,
+      requestStream: false,
+      responseType: ListHistoryResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** Get a specific history session with full test cases */
+    getHistorySession: {
+      name: "GetHistorySession",
+      requestType: GetHistorySessionRequest,
+      requestStream: false,
+      responseType: GetHistorySessionResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** Delete a history session */
+    deleteHistorySession: {
+      name: "DeleteHistorySession",
+      requestType: DeleteHistorySessionRequest,
+      requestStream: false,
+      responseType: DeleteHistorySessionResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -4359,6 +5554,21 @@ export interface TestCasesServiceImplementation<CallContextExt = {}> {
     request: HealthCheckRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<HealthCheckResponse>>;
+  /** List generation history sessions */
+  listHistory(
+    request: ListHistoryRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<ListHistoryResponse>>;
+  /** Get a specific history session with full test cases */
+  getHistorySession(
+    request: GetHistorySessionRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<GetHistorySessionResponse>>;
+  /** Delete a history session */
+  deleteHistorySession(
+    request: DeleteHistorySessionRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<DeleteHistorySessionResponse>>;
 }
 
 export interface TestCasesServiceClient<CallOptionsExt = {}> {
@@ -4392,6 +5602,21 @@ export interface TestCasesServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<HealthCheckRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<HealthCheckResponse>;
+  /** List generation history sessions */
+  listHistory(
+    request: DeepPartial<ListHistoryRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<ListHistoryResponse>;
+  /** Get a specific history session with full test cases */
+  getHistorySession(
+    request: DeepPartial<GetHistorySessionRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<GetHistorySessionResponse>;
+  /** Delete a history session */
+  deleteHistorySession(
+    request: DeepPartial<DeleteHistorySessionRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<DeleteHistorySessionResponse>;
 }
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
