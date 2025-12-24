@@ -74,12 +74,12 @@ export function BasicConfigTab() {
                 key={field.name}
                 className={`inline-flex items-center px-2 py-1 rounded text-xs ${
                   field.required
-                    ? 'bg-[var(--accent-default)] bg-opacity-10 text-[var(--accent-default)]'
+                    ? 'bg-[var(--accent-default)] text-white'
                     : 'bg-gray-200 text-gray-700'
                 }`}
               >
                 {field.name}
-                <span className="ml-1 text-gray-400">({field.type})</span>
+                <span className={`ml-1 ${field.required ? 'text-white/70' : 'text-gray-400'}`}>({field.type})</span>
               </span>
             ))}
           </div>
