@@ -747,7 +747,7 @@ class TestEdgeCases:
 
     @patch("ecommerce_agent.server.knowledge_api.get_weaviate_client")
     def test_limit_zero(self, mock_get_client, client):
-        """Test handling of zero limit."""
+        """Test handling of zero limit - should be rejected by validation."""
         mock_client = MagicMock()
         mock_client.is_connected.return_value = True
         mock_client.search_bm25.return_value = []
@@ -758,9 +758,8 @@ class TestEdgeCases:
             json={"query": "test", "limit": 0}
         )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total_results"] == 0
+        # Zero limit is now rejected by validation (ge=1)
+        assert response.status_code == 422
 
     @patch("ecommerce_agent.server.knowledge_api.get_weaviate_client")
     def test_negative_limit(self, mock_get_client, client):
