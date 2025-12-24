@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ecommerce_agent.clients.test_data_client import get_test_data_client
 from ecommerce_agent.enrichment.enricher import get_enricher, EnrichmentResult
@@ -51,7 +51,7 @@ class GenerationResult:
 
     def __post_init__(self):
         if not self.generated_at:
-            self.generated_at = datetime.utcnow().isoformat()
+            self.generated_at = datetime.now(timezone.utc).isoformat()
 
 
 class GenerationOrchestrator:
