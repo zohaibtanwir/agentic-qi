@@ -212,6 +212,15 @@ message EdgeCase {
 
 // ============ Test Data Generation ============
 
+// Generation method enum
+enum GenerationMethod {
+  GENERATION_METHOD_UNSPECIFIED = 0;
+  GENERATION_METHOD_TRADITIONAL = 1;
+  GENERATION_METHOD_LLM = 2;
+  GENERATION_METHOD_RAG = 3;
+  GENERATION_METHOD_HYBRID = 4;
+}
+
 message GenerateTestDataRequest {
   string request_id = 1;
   string entity = 2;
@@ -222,6 +231,9 @@ message GenerateTestDataRequest {
   bool include_edge_cases = 7;
   string output_format = 8;
   map<string, int32> scenario_counts = 9;
+  GenerationMethod generation_method = 10;
+  bool production_like = 11;
+  bool use_cache = 12;
 }
 
 message GenerateTestDataResponse {

@@ -32,6 +32,13 @@ static_resources:
                             timeout: 0s
                             max_stream_duration:
                               grpc_timeout_header_max: 120s
+                        - match:
+                            prefix: "/ecommerce.domain.v1.EcommerceDomainService"
+                          route:
+                            cluster: ecommerce_domain_service
+                            timeout: 0s
+                            max_stream_duration:
+                              grpc_timeout_header_max: 120s
                       cors:
                         allow_origin_string_match:
                           - prefix: "*"
@@ -80,6 +87,21 @@ static_resources:
                     socket_address:
                       address: host.docker.internal
                       port_value: 9091
+    - name: ecommerce_domain_service
+      connect_timeout: 0.25s
+      type: logical_dns
+      dns_lookup_family: V4_ONLY
+      http2_protocol_options: {}
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ecommerce_domain_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal
+                      port_value: 9002
 
 admin:
   address:
