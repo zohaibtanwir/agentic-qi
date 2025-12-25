@@ -1,7 +1,8 @@
 """Anthropic Claude LLM client implementation."""
 
 import asyncio
-from typing import Dict, List, Optional
+import time
+from typing import Optional
 
 import anthropic
 from anthropic import AsyncAnthropic
@@ -12,7 +13,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from test_cases_agent.llm.base import (
+from requirement_analysis_agent.llm.base import (
     GenerationConfig,
     LLMAPIError,
     LLMAuthenticationError,
@@ -23,22 +24,28 @@ from test_cases_agent.llm.base import (
     Message,
     MessageRole,
 )
-from test_cases_agent.utils.logging import get_logger, log_llm_error, log_llm_request, log_llm_response
+from requirement_analysis_agent.utils.logging import (
+    get_logger,
+    log_llm_error,
+    log_llm_request,
+    log_llm_response,
+)
 
 
 class AnthropicClient(LLMProvider):
-    """Anthropic Claude LLM client."""
+    """Anthropic Claude LLM client for requirement analysis."""
 
-    # Supported models
+    # Supported models with context windows
     MODELS = {
+        "claude-sonnet-4-20250514": 200000,  # Claude Sonnet 4 - default
+        "claude-3-5-sonnet-20241022": 200000,  # Claude 3.5 Sonnet
         "claude-3-opus-20240229": 200000,
         "claude-3-sonnet-20240229": 200000,
         "claude-3-haiku-20240307": 200000,
-        "claude-3-5-sonnet-20241022": 200000,
         "claude-3-5-haiku-20241022": 200000,
     }
 
-    DEFAULT_MODEL = "claude-3-5-sonnet-20241022"
+    DEFAULT_MODEL = "claude-sonnet-4-20250514"
 
     def __init__(self, api_key: str, default_model: Optional[str] = None):
         """
@@ -46,7 +53,7 @@ class AnthropicClient(LLMProvider):
 
         Args:
             api_key: Anthropic API key
-            default_model: Default model to use
+            default_model: Default model to use (defaults to Claude Sonnet 4)
         """
         super().__init__(api_key, default_model or self.DEFAULT_MODEL)
         self.logger = get_logger(__name__)
@@ -55,9 +62,9 @@ class AnthropicClient(LLMProvider):
         """Initialize the Anthropic client."""
         try:
             self._client = AsyncAnthropic(api_key=self.api_key)
-            self.logger.info("Anthropic client initialized")
+            self.logger.info("Anthropic client initialized", model=self.default_model)
         except Exception as e:
-            self.logger.error(f"Failed to initialize Anthropic client: {e}")
+            self.logger.error("Failed to initialize Anthropic client", error=str(e))
             raise LLMAPIError(
                 f"Failed to initialize Anthropic client: {e}",
                 provider=self.provider_name,
@@ -70,7 +77,7 @@ class AnthropicClient(LLMProvider):
     )
     async def generate(
         self,
-        messages: List[Message],
+        messages: list[Message],
         config: Optional[GenerationConfig] = None,
     ) -> LLMResponse:
         """
@@ -87,6 +94,7 @@ class AnthropicClient(LLMProvider):
             await self.initialize()
 
         config = self.validate_config(config)
+        start_time = time.time()
 
         # Extract system message if present
         system_message = None
@@ -98,25 +106,24 @@ class AnthropicClient(LLMProvider):
             else:
                 chat_messages.append({
                     "role": "user" if msg.role == MessageRole.USER else "assistant",
-                    "content": msg.content
+                    "content": msg.content,
                 })
 
         try:
             # Log request
+            prompt_text = " ".join([m.content for m in messages])
             log_llm_request(
                 provider=self.provider_name,
-                model=config.model,
-                prompt_tokens=self.estimate_tokens(
-                    " ".join([m.content for m in messages])
-                ),
+                model=config.model or self.DEFAULT_MODEL,
+                prompt_tokens=self.estimate_tokens(prompt_text),
             )
 
             # Build API call kwargs, only including optional params if set
             api_kwargs = {
-                "model": config.model,
+                "model": config.model or self.DEFAULT_MODEL,
                 "messages": chat_messages,
-                "max_tokens": config.max_tokens or 4096,
-                "timeout": config.timeout or 60,
+                "max_tokens": config.max_tokens or 8192,  # Higher for analysis output
+                "timeout": config.timeout or 120,  # Higher timeout for complex analysis
             }
 
             # Only add optional parameters if they have values
@@ -134,12 +141,14 @@ class AnthropicClient(LLMProvider):
             # Make API call
             response = await self._client.messages.create(**api_kwargs)
 
+            duration_ms = (time.time() - start_time) * 1000
+
             # Log response
             log_llm_response(
                 provider=self.provider_name,
-                model=config.model,
+                model=config.model or self.DEFAULT_MODEL,
                 completion_tokens=response.usage.output_tokens,
-                duration_ms=0,  # TODO: Track actual duration
+                duration_ms=duration_ms,
             )
 
             return LLMResponse(
@@ -153,28 +162,29 @@ class AnthropicClient(LLMProvider):
                 metadata={
                     "message_id": response.id,
                     "stop_sequence": response.stop_sequence,
+                    "duration_ms": duration_ms,
                 },
             )
 
         except anthropic.RateLimitError as e:
-            log_llm_error(self.provider_name, config.model, e)
+            log_llm_error(self.provider_name, config.model or self.DEFAULT_MODEL, e)
             raise LLMRateLimitError(
                 str(e),
                 provider=self.provider_name,
                 status_code=429,
             )
         except anthropic.AuthenticationError as e:
-            log_llm_error(self.provider_name, config.model, e)
+            log_llm_error(self.provider_name, config.model or self.DEFAULT_MODEL, e)
             raise LLMAuthenticationError(
                 str(e),
                 provider=self.provider_name,
                 status_code=401,
             )
         except asyncio.TimeoutError as e:
-            log_llm_error(self.provider_name, config.model, e)
+            log_llm_error(self.provider_name, config.model or self.DEFAULT_MODEL, e)
             raise LLMTimeoutError(f"Request timed out: {e}")
         except Exception as e:
-            log_llm_error(self.provider_name, config.model, e)
+            log_llm_error(self.provider_name, config.model or self.DEFAULT_MODEL, e)
             raise LLMAPIError(
                 f"Anthropic API error: {e}",
                 provider=self.provider_name,
@@ -198,11 +208,34 @@ class AnthropicClient(LLMProvider):
         messages = [Message(role=MessageRole.USER, content=prompt)]
         return await self.generate(messages, config)
 
+    async def generate_with_system(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        config: Optional[GenerationConfig] = None,
+    ) -> LLMResponse:
+        """
+        Generate text with system and user prompts.
+
+        Args:
+            system_prompt: System instructions
+            user_prompt: User message
+            config: Generation configuration
+
+        Returns:
+            LLMResponse with generated content
+        """
+        messages = [
+            Message(role=MessageRole.SYSTEM, content=system_prompt),
+            Message(role=MessageRole.USER, content=user_prompt),
+        ]
+        return await self.generate(messages, config)
+
     def is_available(self) -> bool:
         """Check if Anthropic client is available."""
         return bool(self.api_key and not self.api_key.startswith("your_"))
 
-    def get_supported_models(self) -> List[str]:
+    def get_supported_models(self) -> list[str]:
         """Get list of supported Claude models."""
         return list(self.MODELS.keys())
 
@@ -220,6 +253,7 @@ class AnthropicClient(LLMProvider):
         """Get provider name."""
         return "anthropic"
 
-    def get_model_context_window(self, model: str) -> int:
+    def get_model_context_window(self, model: Optional[str] = None) -> int:
         """Get the context window size for a model."""
+        model = model or self.default_model
         return self.MODELS.get(model, 200000)
