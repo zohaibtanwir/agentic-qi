@@ -32,6 +32,20 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Requirement Analysis Agent */}
+          <AgentCard
+            name="Requirement Analysis Agent"
+            description="Analyze requirements for quality, completeness, and testability before test generation"
+            status="operational"
+            link="/requirement-analysis"
+            features={[
+              'Quality scoring & grading',
+              'Gap detection & suggestions',
+              'Clarifying questions generation',
+              'AI-generated acceptance criteria',
+            ]}
+          />
+
           {/* Test Cases Agent */}
           <AgentCard
             name="Test Cases Agent"

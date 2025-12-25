@@ -39,6 +39,13 @@ static_resources:
                             timeout: 0s
                             max_stream_duration:
                               grpc_timeout_header_max: 120s
+                        - match:
+                            prefix: "/requirementanalysis.v1.RequirementAnalysisService"
+                          route:
+                            cluster: requirement_analysis_service
+                            timeout: 0s
+                            max_stream_duration:
+                              grpc_timeout_header_max: 120s
                       cors:
                         allow_origin_string_match:
                           - prefix: "*"
@@ -102,6 +109,21 @@ static_resources:
                     socket_address:
                       address: host.docker.internal
                       port_value: 9002
+    - name: requirement_analysis_service
+      connect_timeout: 0.25s
+      type: logical_dns
+      dns_lookup_family: V4_ONLY
+      http2_protocol_options: {}
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: requirement_analysis_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: host.docker.internal
+                      port_value: 9004
 
 admin:
   address:

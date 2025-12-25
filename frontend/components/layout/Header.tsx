@@ -9,6 +9,7 @@ export function Header() {
 
   const navLinks = [
     { href: '/', label: 'Home' },
+    { href: '/requirement-analysis', label: 'Requirements' },
     { href: '/test-cases', label: 'Test Cases' },
     { href: '/test-data', label: 'Test Data' },
     { href: '/ecommerce', label: 'eCommerce' },

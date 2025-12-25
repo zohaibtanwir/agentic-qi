@@ -37,6 +37,14 @@ protoc \
   -I=$PROTO_DIR \
   ecommerce_domain.proto
 
+# Generate TypeScript code using ts-proto for requirement_analysis.proto
+protoc \
+  --plugin=./node_modules/.bin/protoc-gen-ts_proto \
+  --ts_proto_out=$OUT_DIR \
+  --ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
+  -I=$PROTO_DIR \
+  requirement_analysis.proto
+
 echo "✓ Proto files generated successfully!"
 echo "  Output: $OUT_DIR/"
 ls -lh $OUT_DIR/

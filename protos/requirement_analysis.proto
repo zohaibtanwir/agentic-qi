@@ -1,0 +1,353 @@
+syntax = "proto3";
+
+package requirementanalysis.v1;
+
+option go_package = "github.com/zohaibtanwir/agentic-qi/protos/requirementanalysis/v1";
+
+// =============================================================================
+// Requirement Analysis Service
+// Analyzes requirements from multiple input formats, assesses quality,
+// identifies gaps, and prepares structured output for test case generation.
+// =============================================================================
+
+service RequirementAnalysisService {
+  // Analyze a requirement from any input type (Jira, free-form, transcript)
+  rpc AnalyzeRequirement(AnalyzeRequest) returns (AnalyzeResponse);
+  
+  // Re-analyze with updates (questions answered, edits made)
+  rpc ReanalyzeRequirement(ReanalyzeRequest) returns (AnalyzeResponse);
+  
+  // Export analysis report in text or JSON format
+  rpc ExportAnalysis(ExportRequest) returns (ExportResponse);
+  
+  // Forward analyzed requirement to Test Cases Agent
+  rpc ForwardToTestCases(ForwardRequest) returns (ForwardResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// =============================================================================
+// Analyze Request/Response
+// =============================================================================
+
+message AnalyzeRequest {
+  string request_id = 1;
+  
+  oneof input {
+    JiraStoryInput jira_story = 2;
+    FreeFormInput free_form = 3;
+    TranscriptInput transcript = 4;
+  }
+  
+  AnalysisConfig config = 5;
+}
+
+message JiraStoryInput {
+  string key = 1;                              // e.g., "ECOM-1234"
+  string summary = 2;                          // Story title
+  string description = 3;                      // Full description
+  repeated string acceptance_criteria = 4;     // Existing ACs
+  int32 story_points = 5;                      // Complexity estimate
+  repeated string labels = 6;                  // Jira labels
+  repeated string components = 7;              // Jira components
+  string priority = 8;                         // High, Medium, Low
+  string reporter = 9;                         // Reporter email
+  string assignee = 10;                        // Assignee email
+  string raw_json = 11;                        // Full Jira JSON if available
+}
+
+message FreeFormInput {
+  string text = 1;                             // Raw requirement text
+  string context = 2;                          // Optional context
+  string title = 3;                            // Optional title
+}
+
+message TranscriptInput {
+  string transcript = 1;                       // Plain text with speaker labels
+  string meeting_title = 2;                    // Meeting name
+  string meeting_date = 3;                     // Date of meeting
+  repeated string participants = 4;            // List of participants
+}
+
+message AnalysisConfig {
+  bool include_domain_validation = 1;          // Validate against Domain Agent
+  bool generate_acceptance_criteria = 2;       // Auto-generate missing ACs
+  bool generate_questions = 3;                 // Generate clarifying questions
+  string llm_provider = 4;                     // anthropic, openai, gemini
+  string domain = 5;                           // Domain context (e.g., "ecommerce")
+}
+
+message AnalyzeResponse {
+  string request_id = 1;
+  bool success = 2;
+  
+  QualityScore quality_score = 3;
+  ExtractedRequirement extracted_requirement = 4;
+  repeated Gap gaps = 5;
+  repeated ClarifyingQuestion questions = 6;
+  repeated GeneratedAC generated_acs = 7;
+  DomainValidation domain_validation = 8;
+  
+  bool ready_for_test_generation = 9;
+  repeated string blockers = 10;
+  
+  AnalysisMetadata metadata = 11;
+  string error = 12;
+}
+
+// =============================================================================
+// Quality Scoring
+// =============================================================================
+
+message QualityScore {
+  int32 overall_score = 1;                     // 0-100
+  string overall_grade = 2;                    // A, B, C, D, F
+  DimensionScore clarity = 3;
+  DimensionScore completeness = 4;
+  DimensionScore testability = 5;
+  DimensionScore consistency = 6;
+  string recommendation = 7;                   // Action recommendation
+}
+
+message DimensionScore {
+  int32 score = 1;                             // 0-100
+  string grade = 2;                            // A, B, C, D, F
+  repeated string issues = 3;                  // Specific issues found
+}
+
+// =============================================================================
+// Extracted Requirement Structure
+// =============================================================================
+
+message ExtractedRequirement {
+  string title = 1;
+  string description = 2;
+  RequirementStructure structure = 3;
+  repeated string original_acs = 4;            // Original acceptance criteria
+  string input_type = 5;                       // jira, free_form, transcript
+}
+
+message RequirementStructure {
+  string actor = 1;                            // Who performs the action
+  repeated string secondary_actors = 2;        // Other actors involved
+  string action = 3;                           // What is being done
+  string object = 4;                           // What is acted upon
+  string outcome = 5;                          // Why / expected result
+  repeated string preconditions = 6;           // Required starting state
+  repeated string postconditions = 7;          // Expected end state
+  repeated string triggers = 8;                // What initiates the action
+  repeated string constraints = 9;             // Limitations or rules
+  repeated string entities = 10;               // Domain entities mentioned
+}
+
+// =============================================================================
+// Gap Detection
+// =============================================================================
+
+message Gap {
+  string id = 1;                               // e.g., "GAP-001"
+  string category = 2;                         // missing_ac, ambiguous_term, etc.
+  string severity = 3;                         // high, medium, low
+  string description = 4;                      // What's missing or unclear
+  string location = 5;                         // Where in the requirement
+  string suggestion = 6;                       // How to fix it
+}
+
+// Gap categories:
+// - missing_ac: Acceptance criteria not specified
+// - ambiguous_term: Vague or undefined language
+// - undefined_term: Domain term not explained
+// - missing_error_handling: No failure scenarios
+// - missing_edge_case: Boundary conditions not covered
+// - missing_precondition: Assumed state not specified
+// - missing_postcondition: End state not defined
+// - contradiction: Conflicting statements
+
+// =============================================================================
+// Clarifying Questions
+// =============================================================================
+
+message ClarifyingQuestion {
+  string id = 1;                               // e.g., "Q-001"
+  string priority = 2;                         // high, medium, low
+  string category = 3;                         // error_handling, scope, ux, etc.
+  string question = 4;                         // The question to ask
+  string context = 5;                          // Why this question matters
+  repeated string suggested_answers = 6;       // Possible answers
+  string answer = 7;                           // Filled in during reanalysis
+}
+
+// =============================================================================
+// Generated Acceptance Criteria
+// =============================================================================
+
+message GeneratedAC {
+  string id = 1;                               // e.g., "AC-GEN-001"
+  string source = 2;                           // gap_detection, domain_knowledge, structure_extraction
+  float confidence = 3;                        // 0.0 - 1.0
+  string text = 4;                             // Plain text AC
+  string gherkin = 5;                          // Gherkin format
+  bool accepted = 6;                           // User decision
+}
+
+// =============================================================================
+// Domain Validation
+// =============================================================================
+
+message DomainValidation {
+  bool valid = 1;
+  repeated EntityMapping entities_found = 2;
+  repeated ApplicableRule rules_applicable = 3;
+  repeated DomainWarning warnings = 4;
+}
+
+message EntityMapping {
+  string term = 1;                             // Term from requirement
+  string mapped_entity = 2;                    // Domain entity name
+  float confidence = 3;                        // Confidence score
+  string domain_description = 4;               // Entity description
+}
+
+message ApplicableRule {
+  string rule_id = 1;
+  string rule = 2;
+  string relevance = 3;                        // high, medium, low
+}
+
+message DomainWarning {
+  string type = 1;                             // missing_entity, rule_violation, etc.
+  string message = 2;
+  string suggestion = 3;
+}
+
+// =============================================================================
+// Analysis Metadata
+// =============================================================================
+
+message AnalysisMetadata {
+  string llm_provider = 1;
+  string llm_model = 2;
+  int32 tokens_used = 3;
+  float analysis_time_ms = 4;
+  string input_type = 5;                       // jira, free_form, transcript
+  string agent_version = 6;
+}
+
+// =============================================================================
+// Reanalyze Request
+// =============================================================================
+
+message ReanalyzeRequest {
+  string request_id = 1;
+  string original_request_id = 2;              // Link to original analysis
+  
+  // Updated content
+  string updated_title = 3;
+  string updated_description = 4;
+  repeated string updated_acs = 5;
+  
+  // Answered questions
+  repeated AnsweredQuestion answered_questions = 6;
+  
+  // Accepted/rejected generated ACs
+  repeated ACDecision ac_decisions = 7;
+  
+  // Additional context provided
+  string additional_context = 8;
+  
+  AnalysisConfig config = 9;
+}
+
+message AnsweredQuestion {
+  string question_id = 1;
+  string answer = 2;
+}
+
+message ACDecision {
+  string ac_id = 1;
+  bool accepted = 2;
+  string modified_text = 3;                    // If user edited the generated AC
+}
+
+// =============================================================================
+// Export Request/Response
+// =============================================================================
+
+message ExportRequest {
+  string request_id = 1;
+  string analysis_request_id = 2;              // ID of the analysis to export
+  string format = 3;                           // text, json
+  bool include_recommendations = 4;
+  bool include_generated_acs = 5;
+}
+
+message ExportResponse {
+  string request_id = 1;
+  bool success = 2;
+  string format = 3;
+  string content = 4;                          // The exported report content
+  string filename = 5;                         // Suggested filename
+  string error = 6;
+}
+
+// =============================================================================
+// Forward to Test Cases Request/Response
+// =============================================================================
+
+message ForwardRequest {
+  string request_id = 1;
+  string analysis_request_id = 2;              // ID of the analysis to forward
+  bool include_generated_acs = 3;              // Include agent-generated ACs
+  bool include_domain_context = 4;             // Include domain validation results
+  TestCasesConfig test_cases_config = 5;       // Config for Test Cases Agent
+}
+
+message TestCasesConfig {
+  string output_format = 1;                    // gherkin, traditional, json
+  string coverage_level = 2;                   // quick, standard, exhaustive
+  repeated string test_types = 3;              // functional, negative, boundary, edge_case
+  string llm_provider = 4;                     // anthropic, openai, gemini
+  bool check_duplicates = 5;
+  int32 max_test_cases = 6;
+}
+
+message ForwardResponse {
+  string request_id = 1;
+  bool success = 2;
+  string test_cases_request_id = 3;            // Request ID from Test Cases Agent
+  int32 test_cases_generated = 4;
+  string structured_requirement_json = 5;      // The requirement sent to TCA
+  string error = 6;
+}
+
+// =============================================================================
+// Health Check
+// =============================================================================
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;                           // healthy, degraded, unhealthy
+  map<string, string> components = 2;          // Component health status
+}
+
+// =============================================================================
+// Structured Requirement (for forwarding to Test Cases Agent)
+// =============================================================================
+
+message StructuredRequirement {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  repeated string acceptance_criteria = 4;
+  string domain = 5;
+  repeated string entities = 6;
+  repeated string preconditions = 7;
+  string additional_context = 8;
+  
+  // Analysis metadata
+  int32 quality_score = 9;
+  bool gaps_addressed = 10;
+  bool questions_answered = 11;
+}

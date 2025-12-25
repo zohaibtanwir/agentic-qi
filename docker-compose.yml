@@ -33,8 +33,31 @@ services:
     volumes:
       - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     depends_on:
+      - requirement-analysis-agent
       - test-cases-agent
       - test-data-agent
+    networks:
+      - qa-platform
+    restart: unless-stopped
+
+  # Requirement Analysis Agent (gRPC Backend) - gRPC 9004, HTTP 8084
+  requirement-analysis-agent:
+    build:
+      context: ./agents/requirement-analysis-agent
+      dockerfile: Dockerfile
+    ports:
+      - "9004:9004"
+      - "8084:8084"
+    environment:
+      - GRPC_PORT=9004
+      - HTTP_PORT=8084
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LOG_LEVEL=INFO
+      - WEAVIATE_URL=http://weaviate:8080
+      - DOMAIN_AGENT_URL=http://ecommerce-domain-agent:9002
+      - TEST_CASES_AGENT_URL=http://test-cases-agent:9003
+    depends_on:
+      - weaviate
     networks:
       - qa-platform
     restart: unless-stopped
