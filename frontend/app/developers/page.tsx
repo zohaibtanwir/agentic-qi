@@ -670,7 +670,7 @@ const agentDocs: Record<Agent, AgentDocs> = {
   },
 };
 
-function CodeBlock({ code, language = 'protobuf' }: { code: string; language?: string }) {
+function CodeBlock({ code }: { code: string }) {
   return (
     <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono">
       <code>{code}</code>
@@ -722,13 +722,13 @@ function EndpointCard({ endpoint, isRest = false }: { endpoint: ApiEndpoint | Re
           {endpoint.request && (
             <div>
               <h4 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">Request</h4>
-              <CodeBlock code={endpoint.request} language={isRest ? 'json' : 'protobuf'} />
+              <CodeBlock code={endpoint.request} />
             </div>
           )}
           {endpoint.response && (
             <div>
               <h4 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">Response</h4>
-              <CodeBlock code={endpoint.response} language={isRest ? 'json' : 'protobuf'} />
+              <CodeBlock code={endpoint.response} />
             </div>
           )}
         </div>
@@ -893,7 +893,6 @@ export default function DevelopersPage() {
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">gRPC-Web (Browser)</h3>
               <CodeBlock
-                language="typescript"
                 code={`import { GrpcWebFetchTransport } from '@protobuf-ts/grpcweb-transport';
 
 const transport = new GrpcWebFetchTransport({
@@ -908,7 +907,6 @@ const response = await client.generateTestCases(request);`}
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">Python gRPC</h3>
               <CodeBlock
-                language="python"
                 code={`import grpc
 from test_cases_pb2_grpc import TestCasesServiceStub
 
@@ -921,7 +919,6 @@ response = stub.GenerateTestCases(request)`}
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">REST API (cURL)</h3>
               <CodeBlock
-                language="bash"
                 code={`# Test Data Agent
 curl -X POST http://localhost:8091/generate \\
   -H "Content-Type: application/json" \\

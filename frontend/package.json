@@ -17,11 +17,13 @@
   "dependencies": {
     "@bufbuild/protobuf": "^2.10.2",
     "@testing-library/dom": "^10.4.1",
+    "date-fns": "^4.1.0",
     "grpc-web": "^2.0.2",
     "next": "^16.1.1",
     "nice-grpc-common": "^2.0.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "recharts": "^2.15.4",
     "zustand": "^5.0.9"
   },
   "devDependencies": {

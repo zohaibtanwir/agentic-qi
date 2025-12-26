@@ -43,7 +43,7 @@ function ScoreLegend() {
   return (
     <div className="flex items-center gap-4 text-xs">
       <span className="text-[var(--text-muted)] font-medium">Score Legend:</span>
-      {grades.map(({ grade, range, label, color }) => (
+      {grades.map(({ grade, range, color }) => (
         <div key={grade} className="flex items-center gap-1.5">
           <span className={`w-5 h-5 ${color} text-white rounded flex items-center justify-center font-bold text-[10px]`}>
             {grade}
