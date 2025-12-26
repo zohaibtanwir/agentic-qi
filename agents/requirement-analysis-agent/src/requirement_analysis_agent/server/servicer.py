@@ -429,6 +429,362 @@ class RequirementAnalysisServicer(pb2_grpc.RequirementAnalysisServiceServicer):
                 error=str(e),
             )
 
+    # =========================================================================
+    # History Management Methods
+    # =========================================================================
+
+    async def ListHistory(
+        self,
+        request: pb2.ListHistoryRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> pb2.ListHistoryResponse:
+        """List analysis history with pagination and filters."""
+        logger.info(
+            "ListHistory called",
+            limit=request.limit,
+            offset=request.offset,
+        )
+
+        try:
+            if not self.history_repo:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("History storage not available")
+                return pb2.ListHistoryResponse()
+
+            # Extract filters
+            filters = request.filters if request.HasField("filters") else None
+            input_type = filters.input_type if filters else None
+            quality_grade = filters.quality_grade if filters else None
+            ready_status = filters.ready_status if filters else None
+            date_from = filters.date_from if filters else None
+            date_to = filters.date_to if filters else None
+
+            # Get results with filters
+            limit = request.limit or 20
+            offset = request.offset or 0
+
+            summaries, total_count = await self.history_repo.list_with_filters(
+                limit=limit,
+                offset=offset,
+                input_type=input_type or None,
+                quality_grade=quality_grade or None,
+                ready_status=ready_status or None,
+                date_from=date_from or None,
+                date_to=date_to or None,
+            )
+
+            # Convert to proto messages
+            sessions = [
+                pb2.HistorySessionSummary(
+                    session_id=s["session_id"],
+                    title=s["title"],
+                    quality_score=s["quality_score"],
+                    quality_grade=s["quality_grade"],
+                    gaps_count=s["gaps_count"],
+                    questions_count=s["questions_count"],
+                    generated_acs_count=s["generated_acs_count"],
+                    ready_for_tests=s["ready_for_tests"],
+                    input_type=s["input_type"],
+                    llm_model=s["llm_model"],
+                    created_at=s["created_at"],
+                )
+                for s in summaries
+            ]
+
+            has_more = (offset + len(sessions)) < total_count
+
+            logger.info(
+                "ListHistory completed",
+                count=len(sessions),
+                total=total_count,
+                has_more=has_more,
+            )
+
+            return pb2.ListHistoryResponse(
+                sessions=sessions,
+                total_count=total_count,
+                has_more=has_more,
+            )
+
+        except Exception as e:
+            logger.error("ListHistory failed", error=str(e))
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return pb2.ListHistoryResponse()
+
+    async def GetHistorySession(
+        self,
+        request: pb2.GetHistorySessionRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> pb2.GetHistorySessionResponse:
+        """Get full details of a history session."""
+        session_id = request.session_id
+        logger.info("GetHistorySession called", session_id=session_id)
+
+        try:
+            if not self.history_repo:
+                return pb2.GetHistorySessionResponse(
+                    success=False,
+                    error="History storage not available",
+                )
+
+            # Get full session
+            session_data = await self.history_repo.get_full_session(session_id)
+            if not session_data:
+                return pb2.GetHistorySessionResponse(
+                    success=False,
+                    error=f"Session not found: {session_id}",
+                )
+
+            result = session_data["analysis_result"]
+
+            # Build the full HistorySession proto
+            session = pb2.HistorySession(
+                session_id=session_id,
+                quality_score=self._build_quality_score_proto(result.quality_score),
+                extracted_requirement=self._build_extracted_proto(result.extracted_requirement),
+                gaps=[self._build_gap_proto(g) for g in result.gaps],
+                questions=[self._build_question_proto(q) for q in result.questions],
+                generated_acs=[self._build_ac_proto(ac) for ac in result.generated_acs],
+                domain_validation=self._build_domain_validation_proto(result.domain_validation) if result.domain_validation else None,
+                ready_for_test_generation=result.ready_for_test_generation,
+                blockers=result.blockers,
+                input_type=result.metadata.input_type.value,
+                llm_provider=result.metadata.llm_provider,
+                llm_model=result.metadata.llm_model,
+                tokens_used=result.metadata.tokens_used,
+                analysis_time_ms=result.metadata.analysis_time_ms,
+                created_at=session_data["created_at"],
+                updated_at=session_data["updated_at"],
+            )
+
+            logger.info("GetHistorySession completed", session_id=session_id)
+
+            return pb2.GetHistorySessionResponse(
+                success=True,
+                session=session,
+            )
+
+        except Exception as e:
+            logger.error("GetHistorySession failed", session_id=session_id, error=str(e))
+            return pb2.GetHistorySessionResponse(
+                success=False,
+                error=str(e),
+            )
+
+    async def DeleteHistorySession(
+        self,
+        request: pb2.DeleteHistorySessionRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> pb2.DeleteHistorySessionResponse:
+        """Delete a history session."""
+        session_id = request.session_id
+        logger.info("DeleteHistorySession called", session_id=session_id)
+
+        try:
+            if not self.history_repo:
+                return pb2.DeleteHistorySessionResponse(
+                    success=False,
+                    error="History storage not available",
+                )
+
+            deleted = await self.history_repo.delete(session_id)
+            if not deleted:
+                return pb2.DeleteHistorySessionResponse(
+                    success=False,
+                    error=f"Session not found or could not be deleted: {session_id}",
+                )
+
+            logger.info("DeleteHistorySession completed", session_id=session_id)
+
+            return pb2.DeleteHistorySessionResponse(success=True)
+
+        except Exception as e:
+            logger.error("DeleteHistorySession failed", session_id=session_id, error=str(e))
+            return pb2.DeleteHistorySessionResponse(
+                success=False,
+                error=str(e),
+            )
+
+    async def SearchHistory(
+        self,
+        request: pb2.SearchHistoryRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> pb2.SearchHistoryResponse:
+        """Search history by keyword."""
+        query = request.query
+        limit = request.limit or 10
+        logger.info("SearchHistory called", query=query, limit=limit)
+
+        try:
+            if not self.history_repo:
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details("History storage not available")
+                return pb2.SearchHistoryResponse()
+
+            # Validate query
+            if not query or not query.strip():
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details("Search query is required")
+                return pb2.SearchHistoryResponse()
+
+            # Search
+            summaries, total_count = await self.history_repo.search(query, limit=limit)
+
+            # Convert to proto messages
+            sessions = [
+                pb2.HistorySessionSummary(
+                    session_id=s["session_id"],
+                    title=s["title"],
+                    quality_score=s["quality_score"],
+                    quality_grade=s["quality_grade"],
+                    gaps_count=s["gaps_count"],
+                    questions_count=s["questions_count"],
+                    generated_acs_count=s["generated_acs_count"],
+                    ready_for_tests=s["ready_for_tests"],
+                    input_type=s["input_type"],
+                    llm_model=s["llm_model"],
+                    created_at=s["created_at"],
+                )
+                for s in summaries
+            ]
+
+            logger.info("SearchHistory completed", query=query, count=len(sessions))
+
+            return pb2.SearchHistoryResponse(
+                sessions=sessions,
+                total_count=total_count,
+            )
+
+        except Exception as e:
+            logger.error("SearchHistory failed", query=query, error=str(e))
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return pb2.SearchHistoryResponse()
+
+    # =========================================================================
+    # Helper Methods for History Proto Building
+    # =========================================================================
+
+    def _build_quality_score_proto(self, qs) -> pb2.QualityScore:
+        """Build QualityScore proto from model."""
+        return pb2.QualityScore(
+            overall_score=qs.overall_score,
+            overall_grade=qs.overall_grade.value,
+            clarity=pb2.DimensionScore(
+                score=qs.clarity.score,
+                grade=qs.clarity.grade.value,
+                issues=qs.clarity.issues,
+            ),
+            completeness=pb2.DimensionScore(
+                score=qs.completeness.score,
+                grade=qs.completeness.grade.value,
+                issues=qs.completeness.issues,
+            ),
+            testability=pb2.DimensionScore(
+                score=qs.testability.score,
+                grade=qs.testability.grade.value,
+                issues=qs.testability.issues,
+            ),
+            consistency=pb2.DimensionScore(
+                score=qs.consistency.score,
+                grade=qs.consistency.grade.value,
+                issues=qs.consistency.issues,
+            ),
+            recommendation=qs.recommendation,
+        )
+
+    def _build_extracted_proto(self, er) -> pb2.ExtractedRequirement:
+        """Build ExtractedRequirement proto from model."""
+        structure = er.structure
+        return pb2.ExtractedRequirement(
+            title=er.title,
+            description=er.description,
+            structure=pb2.RequirementStructure(
+                actor=structure.actor,
+                secondary_actors=structure.secondary_actors,
+                action=structure.action,
+                object=structure.object,
+                outcome=structure.outcome,
+                preconditions=structure.preconditions,
+                postconditions=structure.postconditions,
+                triggers=structure.triggers,
+                constraints=structure.constraints,
+                entities=structure.entities,
+            ),
+            original_acs=er.original_acs,
+            input_type=er.input_type.value,
+        )
+
+    def _build_gap_proto(self, g) -> pb2.Gap:
+        """Build Gap proto from model."""
+        return pb2.Gap(
+            id=g.id,
+            category=g.category.value,
+            severity=g.severity.value,
+            description=g.description,
+            location=g.location,
+            suggestion=g.suggestion,
+        )
+
+    def _build_question_proto(self, q) -> pb2.ClarifyingQuestion:
+        """Build ClarifyingQuestion proto from model."""
+        return pb2.ClarifyingQuestion(
+            id=q.id,
+            priority=q.priority.value,
+            category=q.category.value,
+            question=q.question,
+            context=q.context,
+            suggested_answers=q.suggested_answers,
+            answer=q.answer or "",
+        )
+
+    def _build_ac_proto(self, ac) -> pb2.GeneratedAC:
+        """Build GeneratedAC proto from model."""
+        return pb2.GeneratedAC(
+            id=ac.id,
+            source=ac.source.value,
+            confidence=ac.confidence,
+            text=ac.text,
+            gherkin=ac.gherkin,
+            accepted=ac.accepted,
+        )
+
+    def _build_domain_validation_proto(self, dv) -> pb2.DomainValidation:
+        """Build DomainValidation proto from model."""
+        return pb2.DomainValidation(
+            valid=dv.valid,
+            entities_found=[
+                pb2.EntityMapping(
+                    term=e.term,
+                    mapped_entity=e.mapped_entity,
+                    confidence=e.confidence,
+                    domain_description=e.domain_description,
+                )
+                for e in dv.entities_found
+            ],
+            rules_applicable=[
+                pb2.ApplicableRule(
+                    rule_id=r.rule_id,
+                    rule=r.rule,
+                    relevance=r.relevance.value,
+                )
+                for r in dv.rules_applicable
+            ],
+            warnings=[
+                pb2.DomainWarning(
+                    type=w.type,
+                    message=w.message,
+                    suggestion=w.suggestion,
+                )
+                for w in dv.warnings
+            ],
+        )
+
+    # =========================================================================
+    # Input Parsing and Config Building
+    # =========================================================================
+
     def _parse_input(self, request: pb2.AnalyzeRequest) -> Optional[ParsedInput]:
         """Parse the input from request based on type."""
         input_type = request.WhichOneof("input")

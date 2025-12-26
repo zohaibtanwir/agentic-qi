@@ -84,7 +84,8 @@ class AnalysisEngine:
         config = config or AnalysisConfig()
         request_id = str(uuid.uuid4())
         start_time = time.time()
-        total_tokens = 0
+        # Reset token count at the start to track tokens for this request
+        self.llm_client.reset_token_count()
 
         self.logger.info(
             "Starting requirement analysis",
@@ -172,7 +173,8 @@ class AnalysisEngine:
                 input_type=parsed_input.input_type,
             )
 
-            # Build metadata
+            # Build metadata - get total tokens from LLM client
+            total_tokens = self.llm_client.get_total_tokens()
             metadata = AnalysisMetadata(
                 llm_provider=self.llm_client.provider_name,
                 llm_model=self.llm_client.default_model,

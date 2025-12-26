@@ -96,7 +96,7 @@ class HistoryRepository:
         self,
         query: str,
         limit: int = 10,
-    ) -> list[dict]:
+    ) -> tuple[list[dict], int]:
         """Search for similar analyses.
 
         Args:
@@ -104,26 +104,40 @@ class HistoryRepository:
             limit: Maximum results
 
         Returns:
-            List of matching analysis summaries
+            Tuple of (list of matching analysis summaries, total count)
         """
         results = await self.client.search(query, top_k=limit)
 
         summaries = []
         for result in results:
             data = result["data"]
+            # Truncate title to 100 chars for preview
+            title = data.get("title") or ""
+            title_preview = title[:100] + "..." if len(title) > 100 else title
+
+            # Handle created_at - Weaviate returns datetime for DATE fields
+            created_at = data.get("created_at", "")
+            if hasattr(created_at, "isoformat"):
+                created_at = created_at.isoformat()
+            elif created_at is None:
+                created_at = ""
+
             summaries.append({
-                "uuid": result["id"],
-                "request_id": data.get("request_id"),
-                "title": data.get("title"),
-                "overall_score": data.get("overall_score"),
-                "overall_grade": data.get("overall_grade"),
-                "gaps_count": data.get("gaps_count"),
-                "ready_for_tests": data.get("ready_for_tests"),
-                "created_at": data.get("created_at"),
-                "score": result.get("score"),
+                "session_id": data.get("request_id") or "",
+                "title": title_preview,
+                "quality_score": int(data.get("overall_score") or 0),
+                "quality_grade": data.get("overall_grade") or "",
+                "gaps_count": int(data.get("gaps_count") or 0),
+                "questions_count": int(data.get("questions_count") or 0),
+                "generated_acs_count": int(data.get("generated_acs_count") or 0),
+                "ready_for_tests": bool(data.get("ready_for_tests", False)),
+                "input_type": data.get("input_type") or "",
+                "llm_model": data.get("llm_model") or "",
+                "created_at": str(created_at),
+                "search_score": float(result.get("score") or 0.0),
             })
 
-        return summaries
+        return summaries, len(summaries)
 
     async def list_recent(self, limit: int = 20) -> list[dict]:
         """List recent analyses.
@@ -139,20 +153,125 @@ class HistoryRepository:
         summaries = []
         for result in results:
             data = result["data"]
+
+            # Handle created_at - Weaviate returns datetime for DATE fields
+            created_at = data.get("created_at", "")
+            if hasattr(created_at, "isoformat"):
+                created_at = created_at.isoformat()
+            elif created_at is None:
+                created_at = ""
+
             summaries.append({
                 "uuid": result["id"],
-                "request_id": data.get("request_id"),
-                "title": data.get("title"),
-                "overall_score": data.get("overall_score"),
-                "overall_grade": data.get("overall_grade"),
-                "input_type": data.get("input_type"),
-                "gaps_count": data.get("gaps_count"),
-                "questions_count": data.get("questions_count"),
-                "ready_for_tests": data.get("ready_for_tests"),
-                "created_at": data.get("created_at"),
+                "request_id": data.get("request_id") or "",
+                "title": data.get("title") or "",
+                "overall_score": int(data.get("overall_score") or 0),
+                "overall_grade": data.get("overall_grade") or "",
+                "input_type": data.get("input_type") or "",
+                "gaps_count": int(data.get("gaps_count") or 0),
+                "questions_count": int(data.get("questions_count") or 0),
+                "ready_for_tests": bool(data.get("ready_for_tests", False)),
+                "created_at": str(created_at),
             })
 
         return summaries
+
+    async def list_with_filters(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        input_type: Optional[str] = None,
+        quality_grade: Optional[str] = None,
+        ready_status: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+    ) -> tuple[list[dict], int]:
+        """List analyses with advanced filters and pagination.
+
+        Args:
+            limit: Maximum number of results
+            offset: Pagination offset
+            input_type: Filter by input type (jira, free_form, transcript)
+            quality_grade: Filter by quality grade (A, B, C, D, F)
+            ready_status: Filter by ready status (ready, not_ready)
+            date_from: Filter by date from (ISO string)
+            date_to: Filter by date to (ISO string)
+
+        Returns:
+            Tuple of (list of analysis summaries, total count)
+        """
+        results, total_count = await self.client.list_with_filters(
+            limit=limit,
+            offset=offset,
+            input_type=input_type,
+            quality_grade=quality_grade,
+            ready_status=ready_status,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+        summaries = []
+        for result in results:
+            data = result["data"]
+            # Truncate title to 100 chars for preview
+            title = data.get("title") or ""
+            title_preview = title[:100] + "..." if len(title) > 100 else title
+
+            # Handle created_at - Weaviate returns datetime for DATE fields
+            created_at = data.get("created_at", "")
+            if hasattr(created_at, "isoformat"):
+                created_at = created_at.isoformat()
+            elif created_at is None:
+                created_at = ""
+
+            summaries.append({
+                "session_id": data.get("request_id") or "",
+                "title": title_preview,
+                "quality_score": int(data.get("overall_score") or 0),
+                "quality_grade": data.get("overall_grade") or "",
+                "gaps_count": int(data.get("gaps_count") or 0),
+                "questions_count": int(data.get("questions_count") or 0),
+                "generated_acs_count": int(data.get("generated_acs_count") or 0),
+                "ready_for_tests": bool(data.get("ready_for_tests", False)),
+                "input_type": data.get("input_type") or "",
+                "llm_model": data.get("llm_model") or "",
+                "created_at": str(created_at),
+            })
+
+        return summaries, total_count
+
+    async def get_full_session(self, session_id: str) -> Optional[dict]:
+        """Get full session data including analysis result.
+
+        Args:
+            session_id: The session ID (request_id)
+
+        Returns:
+            Full session dict or None if not found
+        """
+        record = await self.client.get_by_request_id(session_id)
+        if not record:
+            return None
+
+        data = record["data"]
+        result = self._deserialize_result(data)
+
+        if not result:
+            return None
+
+        # Handle created_at - Weaviate returns datetime for DATE fields
+        created_at = data.get("created_at", "")
+        if hasattr(created_at, "isoformat"):
+            created_at = created_at.isoformat()
+        elif created_at is None:
+            created_at = ""
+
+        return {
+            "session_id": session_id,
+            "analysis_result": result,
+            "created_at": str(created_at),
+            "updated_at": str(created_at),  # Same as created for now
+        }
 
     async def delete(self, request_id: str) -> bool:
         """Delete an analysis by request ID.

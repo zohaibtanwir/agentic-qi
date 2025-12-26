@@ -151,13 +151,16 @@ class AnthropicClient(LLMProvider):
                 duration_ms=duration_ms,
             )
 
+            total_tokens = response.usage.input_tokens + response.usage.output_tokens
+            self._track_tokens(total_tokens)
+
             return LLMResponse(
                 content=response.content[0].text,
                 model=response.model,
                 provider=self.provider_name,
                 prompt_tokens=response.usage.input_tokens,
                 completion_tokens=response.usage.output_tokens,
-                total_tokens=response.usage.input_tokens + response.usage.output_tokens,
+                total_tokens=total_tokens,
                 finish_reason=response.stop_reason,
                 metadata={
                     "message_id": response.id,

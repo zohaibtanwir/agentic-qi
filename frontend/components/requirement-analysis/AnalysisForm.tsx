@@ -46,7 +46,7 @@ export function AnalysisForm() {
               onClick={() => setInputType(type.id)}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                 inputType === type.id
-                  ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
+                  ? 'bg-red-50 text-red-700 border-b-2 border-red-600'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
               }`}
             >
@@ -69,7 +69,7 @@ export function AnalysisForm() {
                 value={freeFormForm.title}
                 onChange={(e) => setFreeFormField('title', e.target.value)}
                 placeholder="e.g., Add to Cart Feature"
-                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -81,7 +81,7 @@ export function AnalysisForm() {
                 onChange={(e) => setFreeFormField('text', e.target.value)}
                 placeholder="Enter your requirement here. You can use user story format (As a... I want... So that...) or any other format."
                 rows={8}
-                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
               />
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 {freeFormForm.text.length} characters (minimum 20)
@@ -96,7 +96,7 @@ export function AnalysisForm() {
                 onChange={(e) => setFreeFormField('context', e.target.value)}
                 placeholder="Any additional context, constraints, or background information..."
                 rows={3}
-                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
               />
             </div>
           </div>
@@ -115,7 +115,7 @@ export function AnalysisForm() {
                   value={jiraForm.key}
                   onChange={(e) => setJiraField('key', e.target.value)}
                   placeholder="e.g., ECOM-1234"
-                  className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -125,7 +125,7 @@ export function AnalysisForm() {
                 <select
                   value={jiraForm.priority}
                   onChange={(e) => setJiraField('priority', e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 >
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
@@ -143,7 +143,7 @@ export function AnalysisForm() {
                 value={jiraForm.summary}
                 onChange={(e) => setJiraField('summary', e.target.value)}
                 placeholder="Story title / summary"
-                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -155,7 +155,7 @@ export function AnalysisForm() {
                 onChange={(e) => setJiraField('description', e.target.value)}
                 placeholder="Full story description..."
                 rows={6}
-                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
               />
             </div>
             <div>
@@ -169,7 +169,7 @@ export function AnalysisForm() {
                     value={ac}
                     onChange={(e) => updateJiraAC(index, e.target.value)}
                     placeholder={`Acceptance criterion ${index + 1}`}
-                    className="flex-1 px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                   {jiraForm.acceptanceCriteria.length > 1 && (
                     <button
@@ -185,7 +185,7 @@ export function AnalysisForm() {
               ))}
               <button
                 onClick={() => addJiraAC('')}
-                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                className="text-sm text-red-600 hover:text-red-700 font-medium"
               >
                 + Add Acceptance Criterion
               </button>
@@ -206,7 +206,7 @@ export function AnalysisForm() {
                   value={transcriptForm.meetingTitle}
                   onChange={(e) => setTranscriptField('meetingTitle', e.target.value)}
                   placeholder="e.g., Sprint Planning - Cart Feature"
-                  className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -217,7 +217,7 @@ export function AnalysisForm() {
                   type="date"
                   value={transcriptForm.meetingDate}
                   onChange={(e) => setTranscriptField('meetingDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -230,7 +230,7 @@ export function AnalysisForm() {
                 onChange={(e) => setTranscriptField('transcript', e.target.value)}
                 placeholder="Paste your meeting transcript here. Include speaker labels if available (e.g., 'John: We need to add...')"
                 rows={10}
-                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none font-mono text-sm"
+                className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none font-mono text-sm"
               />
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 {transcriptForm.transcript.length} characters (minimum 50)
@@ -248,7 +248,7 @@ export function AnalysisForm() {
                 type="checkbox"
                 checked={analysisConfig.includeDomainValidation}
                 onChange={(e) => setConfigField('includeDomainValidation', e.target.checked)}
-                className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                className="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500"
               />
               <span className="text-sm text-[var(--text-secondary)]">Include domain validation</span>
             </label>
@@ -257,7 +257,7 @@ export function AnalysisForm() {
                 type="checkbox"
                 checked={analysisConfig.generateAcceptanceCriteria}
                 onChange={(e) => setConfigField('generateAcceptanceCriteria', e.target.checked)}
-                className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                className="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500"
               />
               <span className="text-sm text-[var(--text-secondary)]">Generate acceptance criteria</span>
             </label>
@@ -266,7 +266,7 @@ export function AnalysisForm() {
                 type="checkbox"
                 checked={analysisConfig.generateQuestions}
                 onChange={(e) => setConfigField('generateQuestions', e.target.checked)}
-                className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                className="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500"
               />
               <span className="text-sm text-[var(--text-secondary)]">Generate clarifying questions</span>
             </label>
@@ -275,7 +275,7 @@ export function AnalysisForm() {
               <select
                 value={analysisConfig.domain}
                 onChange={(e) => setConfigField('domain', e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-1.5 text-sm border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               >
                 <option value="ecommerce">E-commerce</option>
                 <option value="fintech">Fintech</option>
@@ -294,7 +294,7 @@ export function AnalysisForm() {
             className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
               isAnalyzing || !canSubmit()
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-purple-600 text-white hover:bg-purple-700'
+                : 'bg-red-600 text-white hover:bg-red-700'
             }`}
           >
             {isAnalyzing ? (

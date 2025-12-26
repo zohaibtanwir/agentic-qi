@@ -262,6 +262,176 @@ class WeaviateClient:
             logger.error("weaviate_list_error", error=str(e))
             return []
 
+    async def list_with_filters(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        input_type: Optional[str] = None,
+        quality_grade: Optional[str] = None,
+        ready_status: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List analyses with advanced filters and pagination.
+
+        Args:
+            limit: Maximum number of results
+            offset: Pagination offset
+            input_type: Filter by input type (jira, free_form, transcript)
+            quality_grade: Filter by quality grade (A, B, C, D, F)
+            ready_status: Filter by ready status (ready, not_ready)
+            date_from: Filter by date from (ISO string)
+            date_to: Filter by date to (ISO string)
+
+        Returns:
+            Tuple of (results list, total count)
+        """
+        if not self.client:
+            raise RuntimeError("Client not connected. Call connect() first.")
+
+        try:
+            collection = self.client.collections.get(self.COLLECTION_ANALYSIS_HISTORY)
+
+            # Build filter conditions
+            filter_conditions = []
+
+            if input_type:
+                filter_conditions.append(
+                    Filter.by_property("input_type").equal(input_type)
+                )
+
+            if quality_grade:
+                filter_conditions.append(
+                    Filter.by_property("overall_grade").equal(quality_grade)
+                )
+
+            if ready_status:
+                is_ready = ready_status == "ready"
+                filter_conditions.append(
+                    Filter.by_property("ready_for_tests").equal(is_ready)
+                )
+
+            if date_from:
+                filter_conditions.append(
+                    Filter.by_property("created_at").greater_or_equal(date_from)
+                )
+
+            if date_to:
+                filter_conditions.append(
+                    Filter.by_property("created_at").less_or_equal(date_to)
+                )
+
+            # Combine filters with AND
+            combined_filter = None
+            if filter_conditions:
+                combined_filter = filter_conditions[0]
+                for f in filter_conditions[1:]:
+                    combined_filter = combined_filter & f
+
+            # Get total count first
+            if combined_filter:
+                count_response = collection.aggregate.over_all(
+                    filters=combined_filter,
+                )
+            else:
+                count_response = collection.aggregate.over_all()
+
+            total_count = count_response.total_count if count_response.total_count is not None else 0
+
+            # Fetch paginated results
+            response = collection.query.fetch_objects(
+                filters=combined_filter,
+                limit=limit,
+                offset=offset,
+                return_metadata=MetadataQuery(creation_time=True),
+            )
+
+            results = []
+            for obj in response.objects:
+                results.append({
+                    "id": str(obj.uuid),
+                    "data": obj.properties,
+                    "created_at": obj.metadata.creation_time if obj.metadata else None,
+                })
+
+            logger.info(
+                "weaviate_list_filtered",
+                count=len(results),
+                total=total_count,
+                filters={
+                    "input_type": input_type,
+                    "quality_grade": quality_grade,
+                    "ready_status": ready_status,
+                },
+            )
+
+            return results, total_count
+
+        except Exception as e:
+            logger.error("weaviate_list_filtered_error", error=str(e))
+            return [], 0
+
+    async def count_with_filters(
+        self,
+        input_type: Optional[str] = None,
+        quality_grade: Optional[str] = None,
+        ready_status: Optional[str] = None,
+    ) -> int:
+        """Count analyses matching filters.
+
+        Args:
+            input_type: Filter by input type
+            quality_grade: Filter by quality grade
+            ready_status: Filter by ready status
+
+        Returns:
+            Count of matching analyses
+        """
+        if not self.client:
+            raise RuntimeError("Client not connected. Call connect() first.")
+
+        try:
+            collection = self.client.collections.get(self.COLLECTION_ANALYSIS_HISTORY)
+
+            # Build filter conditions
+            filter_conditions = []
+
+            if input_type:
+                filter_conditions.append(
+                    Filter.by_property("input_type").equal(input_type)
+                )
+
+            if quality_grade:
+                filter_conditions.append(
+                    Filter.by_property("overall_grade").equal(quality_grade)
+                )
+
+            if ready_status:
+                is_ready = ready_status == "ready"
+                filter_conditions.append(
+                    Filter.by_property("ready_for_tests").equal(is_ready)
+                )
+
+            # Combine filters with AND
+            combined_filter = None
+            if filter_conditions:
+                combined_filter = filter_conditions[0]
+                for f in filter_conditions[1:]:
+                    combined_filter = combined_filter & f
+
+            if combined_filter:
+                response = collection.aggregate.over_all(
+                    filters=combined_filter,
+                )
+            else:
+                response = collection.aggregate.over_all()
+
+            return response.total_count if response.total_count is not None else 0
+
+        except Exception as e:
+            logger.error("weaviate_count_filtered_error", error=str(e))
+            return 0
+
     async def delete(self, uuid: str) -> bool:
         """Delete an analysis by UUID.
 
@@ -295,8 +465,8 @@ class WeaviateClient:
 
         try:
             collection = self.client.collections.get(self.COLLECTION_ANALYSIS_HISTORY)
-            response = collection.aggregate.over_all(total_count=True)
-            return response.total_count or 0
+            response = collection.aggregate.over_all()
+            return response.total_count if response.total_count is not None else 0
 
         except Exception as e:
             logger.error("weaviate_count_error", error=str(e))

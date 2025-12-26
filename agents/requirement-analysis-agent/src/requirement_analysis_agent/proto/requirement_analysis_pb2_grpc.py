@@ -65,6 +65,26 @@ class RequirementAnalysisServiceStub(object):
                 request_serializer=requirement__analysis__pb2.HealthCheckRequest.SerializeToString,
                 response_deserializer=requirement__analysis__pb2.HealthCheckResponse.FromString,
                 _registered_method=True)
+        self.ListHistory = channel.unary_unary(
+                '/requirementanalysis.v1.RequirementAnalysisService/ListHistory',
+                request_serializer=requirement__analysis__pb2.ListHistoryRequest.SerializeToString,
+                response_deserializer=requirement__analysis__pb2.ListHistoryResponse.FromString,
+                _registered_method=True)
+        self.GetHistorySession = channel.unary_unary(
+                '/requirementanalysis.v1.RequirementAnalysisService/GetHistorySession',
+                request_serializer=requirement__analysis__pb2.GetHistorySessionRequest.SerializeToString,
+                response_deserializer=requirement__analysis__pb2.GetHistorySessionResponse.FromString,
+                _registered_method=True)
+        self.DeleteHistorySession = channel.unary_unary(
+                '/requirementanalysis.v1.RequirementAnalysisService/DeleteHistorySession',
+                request_serializer=requirement__analysis__pb2.DeleteHistorySessionRequest.SerializeToString,
+                response_deserializer=requirement__analysis__pb2.DeleteHistorySessionResponse.FromString,
+                _registered_method=True)
+        self.SearchHistory = channel.unary_unary(
+                '/requirementanalysis.v1.RequirementAnalysisService/SearchHistory',
+                request_serializer=requirement__analysis__pb2.SearchHistoryRequest.SerializeToString,
+                response_deserializer=requirement__analysis__pb2.SearchHistoryResponse.FromString,
+                _registered_method=True)
 
 
 class RequirementAnalysisServiceServicer(object):
@@ -111,6 +131,38 @@ class RequirementAnalysisServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListHistory(self, request, context):
+        """==========================================================================
+        History Management
+        ==========================================================================
+
+        List analysis history with pagination and filters
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetHistorySession(self, request, context):
+        """Get full details of a history session
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteHistorySession(self, request, context):
+        """Delete a history session
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SearchHistory(self, request, context):
+        """Search history by keyword
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RequirementAnalysisServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -138,6 +190,26 @@ def add_RequirementAnalysisServiceServicer_to_server(servicer, server):
                     servicer.HealthCheck,
                     request_deserializer=requirement__analysis__pb2.HealthCheckRequest.FromString,
                     response_serializer=requirement__analysis__pb2.HealthCheckResponse.SerializeToString,
+            ),
+            'ListHistory': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListHistory,
+                    request_deserializer=requirement__analysis__pb2.ListHistoryRequest.FromString,
+                    response_serializer=requirement__analysis__pb2.ListHistoryResponse.SerializeToString,
+            ),
+            'GetHistorySession': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetHistorySession,
+                    request_deserializer=requirement__analysis__pb2.GetHistorySessionRequest.FromString,
+                    response_serializer=requirement__analysis__pb2.GetHistorySessionResponse.SerializeToString,
+            ),
+            'DeleteHistorySession': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteHistorySession,
+                    request_deserializer=requirement__analysis__pb2.DeleteHistorySessionRequest.FromString,
+                    response_serializer=requirement__analysis__pb2.DeleteHistorySessionResponse.SerializeToString,
+            ),
+            'SearchHistory': grpc.unary_unary_rpc_method_handler(
+                    servicer.SearchHistory,
+                    request_deserializer=requirement__analysis__pb2.SearchHistoryRequest.FromString,
+                    response_serializer=requirement__analysis__pb2.SearchHistoryResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -281,6 +353,114 @@ class RequirementAnalysisService(object):
             '/requirementanalysis.v1.RequirementAnalysisService/HealthCheck',
             requirement__analysis__pb2.HealthCheckRequest.SerializeToString,
             requirement__analysis__pb2.HealthCheckResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListHistory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/requirementanalysis.v1.RequirementAnalysisService/ListHistory',
+            requirement__analysis__pb2.ListHistoryRequest.SerializeToString,
+            requirement__analysis__pb2.ListHistoryResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetHistorySession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/requirementanalysis.v1.RequirementAnalysisService/GetHistorySession',
+            requirement__analysis__pb2.GetHistorySessionRequest.SerializeToString,
+            requirement__analysis__pb2.GetHistorySessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteHistorySession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/requirementanalysis.v1.RequirementAnalysisService/DeleteHistorySession',
+            requirement__analysis__pb2.DeleteHistorySessionRequest.SerializeToString,
+            requirement__analysis__pb2.DeleteHistorySessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SearchHistory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/requirementanalysis.v1.RequirementAnalysisService/SearchHistory',
+            requirement__analysis__pb2.SearchHistoryRequest.SerializeToString,
+            requirement__analysis__pb2.SearchHistoryResponse.FromString,
             options,
             channel_credentials,
             insecure,

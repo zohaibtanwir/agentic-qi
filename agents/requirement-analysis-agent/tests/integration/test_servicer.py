@@ -60,8 +60,24 @@ class MockLLMClient:
 class MockContext:
     """Mock gRPC context."""
 
+    def __init__(self):
+        self._code = None
+        self._details = None
+
     async def abort(self, code, details):
         raise Exception(f"gRPC abort: {code} - {details}")
+
+    def set_code(self, code):
+        self._code = code
+
+    def set_details(self, details):
+        self._details = details
+
+    def get_code(self):
+        return self._code
+
+    def get_details(self):
+        return self._details
 
 
 @pytest.fixture
@@ -593,6 +609,256 @@ class TestReanalyzeRequirement:
 
         assert response.success is False
         assert "not available" in response.error.lower()
+
+
+class TestHistoryMethods:
+    """Tests for History RPC methods."""
+
+    @pytest.fixture
+    def servicer_with_history(
+        self, mock_settings: Settings, mock_llm_client: MockLLMClient, sample_analysis_result: AnalysisResult
+    ) -> RequirementAnalysisServicer:
+        """Create servicer with mocked history repository."""
+        servicer = RequirementAnalysisServicer(
+            settings=mock_settings,
+            llm_client=mock_llm_client,
+        )
+
+        # Mock the history repository
+        mock_repo = AsyncMock()
+
+        # Mock list_with_filters return value
+        mock_repo.list_with_filters = AsyncMock(return_value=([
+            {
+                "session_id": "REQ-001",
+                "title": "Test Requirement 1",
+                "quality_score": 85,
+                "quality_grade": "B",
+                "gaps_count": 2,
+                "questions_count": 1,
+                "generated_acs_count": 3,
+                "ready_for_tests": True,
+                "input_type": "jira",
+                "llm_model": "claude-sonnet-4-20250514",
+                "created_at": "2024-01-15T10:00:00Z",
+            },
+            {
+                "session_id": "REQ-002",
+                "title": "Test Requirement 2",
+                "quality_score": 70,
+                "quality_grade": "C",
+                "gaps_count": 5,
+                "questions_count": 3,
+                "generated_acs_count": 1,
+                "ready_for_tests": False,
+                "input_type": "free_form",
+                "llm_model": "claude-sonnet-4-20250514",
+                "created_at": "2024-01-14T10:00:00Z",
+            },
+        ], 10))
+
+        # Mock get_full_session return value
+        mock_repo.get_full_session = AsyncMock(return_value={
+            "session_id": "REQ-001",
+            "analysis_result": sample_analysis_result,
+            "created_at": "2024-01-15T10:00:00Z",
+            "updated_at": "2024-01-15T10:00:00Z",
+        })
+
+        # Mock delete return value
+        mock_repo.delete = AsyncMock(return_value=True)
+
+        # Mock search return value
+        mock_repo.search = AsyncMock(return_value=([
+            {
+                "session_id": "REQ-001",
+                "title": "Cart Checkout Feature",
+                "quality_score": 85,
+                "quality_grade": "B",
+                "gaps_count": 2,
+                "questions_count": 1,
+                "generated_acs_count": 3,
+                "ready_for_tests": True,
+                "input_type": "jira",
+                "llm_model": "claude-sonnet-4-20250514",
+                "created_at": "2024-01-15T10:00:00Z",
+                "search_score": 0.95,
+            },
+        ], 1))
+
+        servicer.history_repo = mock_repo
+        return servicer
+
+    async def test_list_history_success(
+        self, servicer_with_history: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test listing history successfully."""
+        request = pb2.ListHistoryRequest(
+            limit=10,
+            offset=0,
+        )
+
+        response = await servicer_with_history.ListHistory(request, mock_context)
+
+        assert mock_context.get_code() is None  # No error code set
+        assert len(response.sessions) == 2
+        assert response.total_count == 10
+        assert response.sessions[0].session_id == "REQ-001"
+        assert response.sessions[0].quality_score == 85
+
+    async def test_list_history_with_filters(
+        self, servicer_with_history: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test listing history with filters."""
+        request = pb2.ListHistoryRequest(
+            limit=10,
+            offset=0,
+            filters=pb2.HistoryFilters(
+                input_type="jira",
+                quality_grade="B",
+                ready_status="ready",
+            ),
+        )
+
+        response = await servicer_with_history.ListHistory(request, mock_context)
+
+        assert mock_context.get_code() is None  # No error code set
+        # Verify filters were passed to repository
+        servicer_with_history.history_repo.list_with_filters.assert_called_once_with(
+            limit=10,
+            offset=0,
+            input_type="jira",
+            quality_grade="B",
+            ready_status="ready",
+            date_from=None,
+            date_to=None,
+        )
+
+    async def test_list_history_no_repo(
+        self, servicer: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test listing history when repository not available."""
+        request = pb2.ListHistoryRequest(limit=10)
+
+        response = await servicer.ListHistory(request, mock_context)
+
+        import grpc
+        assert mock_context.get_code() == grpc.StatusCode.UNAVAILABLE
+        assert "not available" in mock_context.get_details().lower()
+
+    async def test_get_history_session_success(
+        self, servicer_with_history: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test getting a history session successfully."""
+        request = pb2.GetHistorySessionRequest(session_id="REQ-001")
+
+        response = await servicer_with_history.GetHistorySession(request, mock_context)
+
+        assert response.success is True
+        assert response.session.session_id == "REQ-001"
+        assert response.session.quality_score.overall_score == 82  # From sample_analysis_result
+
+    async def test_get_history_session_not_found(
+        self, servicer_with_history: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test getting a non-existent history session."""
+        servicer_with_history.history_repo.get_full_session = AsyncMock(return_value=None)
+
+        request = pb2.GetHistorySessionRequest(session_id="NON-EXISTENT")
+
+        response = await servicer_with_history.GetHistorySession(request, mock_context)
+
+        assert response.success is False
+        assert "not found" in response.error.lower()
+
+    async def test_get_history_session_no_repo(
+        self, servicer: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test getting history session when repository not available."""
+        request = pb2.GetHistorySessionRequest(session_id="REQ-001")
+
+        response = await servicer.GetHistorySession(request, mock_context)
+
+        assert response.success is False
+        assert "not available" in response.error.lower()
+
+    async def test_delete_history_session_success(
+        self, servicer_with_history: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test deleting a history session successfully."""
+        request = pb2.DeleteHistorySessionRequest(session_id="REQ-001")
+
+        response = await servicer_with_history.DeleteHistorySession(request, mock_context)
+
+        assert response.success is True
+        servicer_with_history.history_repo.delete.assert_called_once_with("REQ-001")
+
+    async def test_delete_history_session_not_found(
+        self, servicer_with_history: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test deleting a non-existent history session."""
+        servicer_with_history.history_repo.delete = AsyncMock(return_value=False)
+
+        request = pb2.DeleteHistorySessionRequest(session_id="NON-EXISTENT")
+
+        response = await servicer_with_history.DeleteHistorySession(request, mock_context)
+
+        assert response.success is False
+        assert "not found" in response.error.lower() or "failed" in response.error.lower()
+
+    async def test_delete_history_session_no_repo(
+        self, servicer: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test deleting history session when repository not available."""
+        request = pb2.DeleteHistorySessionRequest(session_id="REQ-001")
+
+        response = await servicer.DeleteHistorySession(request, mock_context)
+
+        assert response.success is False
+        assert "not available" in response.error.lower()
+
+    async def test_search_history_success(
+        self, servicer_with_history: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test searching history successfully."""
+        request = pb2.SearchHistoryRequest(
+            query="checkout",
+            limit=10,
+        )
+
+        response = await servicer_with_history.SearchHistory(request, mock_context)
+
+        assert mock_context.get_code() is None  # No error code set
+        assert len(response.sessions) == 1
+        assert response.total_count == 1
+        assert "checkout" in response.sessions[0].title.lower()
+
+    async def test_search_history_empty_query(
+        self, servicer_with_history: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test searching with empty query."""
+        request = pb2.SearchHistoryRequest(
+            query="",
+            limit=10,
+        )
+
+        response = await servicer_with_history.SearchHistory(request, mock_context)
+
+        import grpc
+        assert mock_context.get_code() == grpc.StatusCode.INVALID_ARGUMENT
+        assert "query" in mock_context.get_details().lower()
+
+    async def test_search_history_no_repo(
+        self, servicer: RequirementAnalysisServicer, mock_context: MockContext
+    ) -> None:
+        """Test searching history when repository not available."""
+        request = pb2.SearchHistoryRequest(query="test", limit=10)
+
+        response = await servicer.SearchHistory(request, mock_context)
+
+        import grpc
+        assert mock_context.get_code() == grpc.StatusCode.UNAVAILABLE
+        assert "not available" in mock_context.get_details().lower()
 
 
 class TestServicerInitialization:

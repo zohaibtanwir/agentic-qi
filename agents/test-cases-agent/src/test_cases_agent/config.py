@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     environment: Environment = Field(
         default=Environment.DEVELOPMENT, description="Environment"
     )
-    grpc_port: int = Field(default=9003, description="gRPC server port")
+    grpc_port: int = Field(default=9004, description="gRPC server port")
     http_port: int = Field(default=8083, description="HTTP health check port")
     log_level: LogLevel = Field(default=LogLevel.INFO, description="Log level")
 

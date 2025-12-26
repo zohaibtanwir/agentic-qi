@@ -3,12 +3,13 @@
 import { useRequirementAnalysisStore, type RequirementAnalysisStore } from '@/lib/stores/requirement-analysis-store';
 
 function GradeIcon({ grade }: { grade: string }) {
+  // Macy's-themed grade colors with high contrast
   const colors: Record<string, string> = {
-    A: 'bg-green-100 text-green-700 border-green-300',
-    B: 'bg-blue-100 text-blue-700 border-blue-300',
-    C: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-    D: 'bg-orange-100 text-orange-700 border-orange-300',
-    F: 'bg-red-100 text-red-700 border-red-300',
+    A: 'bg-green-600 text-white border-green-700',
+    B: 'bg-blue-600 text-white border-blue-700',
+    C: 'bg-amber-500 text-white border-amber-600',
+    D: 'bg-orange-500 text-white border-orange-600',
+    F: 'bg-red-600 text-white border-red-700',
   };
   return (
     <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border text-lg font-bold ${colors[grade] || colors.C}`}>
@@ -27,6 +28,30 @@ function SeverityBadge({ severity }: { severity: string }) {
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[severity] || colors.medium}`}>
       {severity}
     </span>
+  );
+}
+
+function ScoreLegend() {
+  const grades = [
+    { grade: 'A', range: '90-100', label: 'Excellent', color: 'bg-green-600' },
+    { grade: 'B', range: '80-89', label: 'Good', color: 'bg-blue-600' },
+    { grade: 'C', range: '70-79', label: 'Fair', color: 'bg-amber-500' },
+    { grade: 'D', range: '60-69', label: 'Needs Work', color: 'bg-orange-500' },
+    { grade: 'F', range: '0-59', label: 'Poor', color: 'bg-red-600' },
+  ];
+
+  return (
+    <div className="flex items-center gap-4 text-xs">
+      <span className="text-[var(--text-muted)] font-medium">Score Legend:</span>
+      {grades.map(({ grade, range, label, color }) => (
+        <div key={grade} className="flex items-center gap-1.5">
+          <span className={`w-5 h-5 ${color} text-white rounded flex items-center justify-center font-bold text-[10px]`}>
+            {grade}
+          </span>
+          <span className="text-[var(--text-muted)]">{range}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -93,12 +118,15 @@ export function AnalysisResults() {
       {/* Quality Score Card */}
       {qualityScore && (
         <div className="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-default)] p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Quality Score</h2>
             <div className="flex items-center gap-3">
               <span className="text-3xl font-bold text-[var(--text-primary)]">{qualityScore.overallScore}</span>
               <GradeIcon grade={qualityScore.overallGrade} />
             </div>
+          </div>
+          <div className="mb-4">
+            <ScoreLegend />
           </div>
 
           {/* Dimension Scores */}
@@ -117,7 +145,7 @@ export function AnalysisResults() {
                 <div className="text-xl font-semibold text-[var(--text-primary)]">{dim.data?.score || 0}</div>
                 <div className="mt-1 w-full bg-gray-200 rounded-full h-1.5">
                   <div
-                    className="bg-purple-600 h-1.5 rounded-full"
+                    className="bg-red-600 h-1.5 rounded-full"
                     style={{ width: `${dim.data?.score || 0}%` }}
                   />
                 </div>
@@ -182,7 +210,7 @@ export function AnalysisResults() {
               <span className="text-[var(--text-muted)] text-sm">Domain Entities:</span>
               <div className="flex flex-wrap gap-2 mt-1">
                 {extractedRequirement.structure.entities.map((entity, i) => (
-                  <span key={i} className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                  <span key={i} className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
                     {entity}
                   </span>
                 ))}
@@ -210,7 +238,7 @@ export function AnalysisResults() {
                   <span className="text-xs text-[var(--text-muted)]">{gap.location}</span>
                 </div>
                 <p className="text-sm text-[var(--text-primary)] mb-2">{gap.description}</p>
-                <p className="text-sm text-purple-600">
+                <p className="text-sm text-red-600">
                   <span className="font-medium">Suggestion:</span> {gap.suggestion}
                 </p>
               </div>
@@ -248,8 +276,8 @@ export function AnalysisResults() {
                             onClick={() => answerQuestion(q.id, ans)}
                             className={`text-xs px-2 py-1 rounded border transition-colors ${
                               answered?.answer === ans
-                                ? 'bg-purple-100 border-purple-300 text-purple-700'
-                                : 'border-[var(--border-default)] hover:border-purple-300'
+                                ? 'bg-red-100 border-red-300 text-red-700'
+                                : 'border-[var(--border-default)] hover:border-red-300'
                             }`}
                           >
                             {ans}
@@ -264,7 +292,7 @@ export function AnalysisResults() {
                     value={answered?.answer || ''}
                     onChange={(e) => answerQuestion(q.id, e.target.value)}
                     placeholder="Type your answer..."
-                    className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                 </div>
               );
@@ -286,7 +314,7 @@ export function AnalysisResults() {
                 className={`border rounded-lg p-4 cursor-pointer transition-colors ${
                   acceptedACs.includes(ac.id)
                     ? 'border-green-300 bg-green-50'
-                    : 'border-[var(--border-default)] hover:border-purple-300'
+                    : 'border-[var(--border-default)] hover:border-red-300'
                 }`}
                 onClick={() => toggleACAcceptance(ac.id)}
               >
@@ -300,7 +328,7 @@ export function AnalysisResults() {
                       onClick={(e) => e.stopPropagation()}
                     />
                     <span className="text-sm font-mono text-[var(--text-muted)]">{ac.id}</span>
-                    <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                    <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded">
                       {ac.source.replace(/_/g, ' ')}
                     </span>
                   </div>
@@ -311,7 +339,7 @@ export function AnalysisResults() {
                 <p className="text-sm text-[var(--text-primary)] mb-2">{ac.text}</p>
                 {ac.gherkin && (
                   <details className="mt-2">
-                    <summary className="text-xs text-purple-600 cursor-pointer">Show Gherkin</summary>
+                    <summary className="text-xs text-red-600 cursor-pointer">Show Gherkin</summary>
                     <pre className="mt-2 p-2 bg-gray-50 rounded text-xs font-mono whitespace-pre-wrap">
                       {ac.gherkin}
                     </pre>
@@ -331,7 +359,7 @@ export function AnalysisResults() {
           className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
             isReanalyzing
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-purple-600 text-white hover:bg-purple-700'
+              : 'bg-red-600 text-white hover:bg-red-700'
           }`}
         >
           {isReanalyzing ? (
@@ -353,7 +381,7 @@ export function AnalysisResults() {
         <div className="text-xs text-[var(--text-muted)] flex items-center gap-4">
           <span>Model: {analysisResult.metadata.llmModel}</span>
           <span>Tokens: {analysisResult.metadata.tokensUsed.toLocaleString()}</span>
-          <span>Time: {analysisResult.metadata.analysisTimeMs.toFixed(0)}ms</span>
+          <span>Time: {(analysisResult.metadata.analysisTimeMs / 1000).toFixed(3)}s</span>
         </div>
       )}
     </div>

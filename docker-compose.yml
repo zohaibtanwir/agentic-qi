@@ -36,6 +36,7 @@ services:
       - requirement-analysis-agent
       - test-cases-agent
       - test-data-agent
+      - ecommerce-domain-agent
     networks:
       - qa-platform
     restart: unless-stopped
@@ -107,6 +108,31 @@ services:
       - qa-platform
     restart: unless-stopped
 
+  # eCommerce Domain Agent (gRPC Backend) - gRPC 9002, HTTP 8082
+  ecommerce-domain-agent:
+    build:
+      context: ./agents/ecommerce-domain-agent/service
+      dockerfile: Dockerfile
+    container_name: qa-ecommerce-domain-agent
+    ports:
+      - "9002:9002"
+      - "8082:8082"
+    environment:
+      - SERVICE_NAME=ecommerce-domain-agent
+      - GRPC_PORT=9002
+      - HTTP_PORT=8082
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=development
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - WEAVIATE_URL=http://weaviate:8080
+      - TEST_DATA_AGENT_URL=http://test-data-agent:9091
+    depends_on:
+      - weaviate
+      - test-data-agent
+    networks:
+      - qa-platform
+    restart: unless-stopped
+
   # Redis Cache - Port 6379
   redis:
     image: redis:7-alpine
@@ -124,7 +150,7 @@ services:
 
   # Weaviate Vector Database - HTTP 8080, gRPC 50051
   weaviate:
-    image: semitechnologies/weaviate:1.24.1
+    image: semitechnologies/weaviate:1.28.2
     container_name: qa-weaviate
     ports:
       - "8080:8080"

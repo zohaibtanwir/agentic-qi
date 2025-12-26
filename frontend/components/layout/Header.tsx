@@ -13,6 +13,7 @@ export function Header() {
     { href: '/test-cases', label: 'Test Cases' },
     { href: '/test-data', label: 'Test Data' },
     { href: '/ecommerce', label: 'eCommerce' },
+    { href: '/developers', label: 'API Docs' },
   ];
 
   return (

@@ -13,18 +13,34 @@ option go_package = "github.com/zohaibtanwir/agentic-qi/protos/requirementanalys
 service RequirementAnalysisService {
   // Analyze a requirement from any input type (Jira, free-form, transcript)
   rpc AnalyzeRequirement(AnalyzeRequest) returns (AnalyzeResponse);
-  
+
   // Re-analyze with updates (questions answered, edits made)
   rpc ReanalyzeRequirement(ReanalyzeRequest) returns (AnalyzeResponse);
-  
+
   // Export analysis report in text or JSON format
   rpc ExportAnalysis(ExportRequest) returns (ExportResponse);
-  
+
   // Forward analyzed requirement to Test Cases Agent
   rpc ForwardToTestCases(ForwardRequest) returns (ForwardResponse);
-  
+
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // ==========================================================================
+  // History Management
+  // ==========================================================================
+
+  // List analysis history with pagination and filters
+  rpc ListHistory(ListHistoryRequest) returns (ListHistoryResponse);
+
+  // Get full details of a history session
+  rpc GetHistorySession(GetHistorySessionRequest) returns (GetHistorySessionResponse);
+
+  // Delete a history session
+  rpc DeleteHistorySession(DeleteHistorySessionRequest) returns (DeleteHistorySessionResponse);
+
+  // Search history by keyword
+  rpc SearchHistory(SearchHistoryRequest) returns (SearchHistoryResponse);
 }
 
 // =============================================================================
@@ -345,9 +361,100 @@ message StructuredRequirement {
   repeated string entities = 6;
   repeated string preconditions = 7;
   string additional_context = 8;
-  
+
   // Analysis metadata
   int32 quality_score = 9;
   bool gaps_addressed = 10;
   bool questions_answered = 11;
+}
+
+// =============================================================================
+// History Management
+// =============================================================================
+
+message HistoryFilters {
+  string input_type = 1;                         // jira, free_form, transcript, or empty for all
+  string quality_grade = 2;                      // A, B, C, D, F, or empty for all
+  string ready_status = 3;                       // ready, not_ready, or empty for all
+  string date_from = 4;                          // ISO date string (e.g., "2024-01-01")
+  string date_to = 5;                            // ISO date string (e.g., "2024-12-31")
+}
+
+message ListHistoryRequest {
+  int32 limit = 1;                               // Max results (default 20)
+  int32 offset = 2;                              // Pagination offset
+  HistoryFilters filters = 3;                    // Optional filters
+}
+
+message ListHistoryResponse {
+  repeated HistorySessionSummary sessions = 1;
+  int32 total_count = 2;
+  bool has_more = 3;
+}
+
+message HistorySessionSummary {
+  string session_id = 1;                         // Unique session ID (request_id)
+  string title = 2;                              // Title preview (first 100 chars)
+  int32 quality_score = 3;                       // 0-100
+  string quality_grade = 4;                      // A, B, C, D, F
+  int32 gaps_count = 5;                          // Number of gaps detected
+  int32 questions_count = 6;                     // Number of clarifying questions
+  int32 generated_acs_count = 7;                 // Number of generated ACs
+  bool ready_for_tests = 8;                      // Ready for test generation
+  string input_type = 9;                         // jira, free_form, transcript
+  string llm_model = 10;                         // Model used for analysis
+  string created_at = 11;                        // ISO timestamp
+}
+
+message GetHistorySessionRequest {
+  string session_id = 1;                         // Session ID to retrieve
+}
+
+message GetHistorySessionResponse {
+  bool success = 1;
+  HistorySession session = 2;
+  string error = 3;
+}
+
+message HistorySession {
+  string session_id = 1;
+
+  // Full analysis data
+  QualityScore quality_score = 2;
+  ExtractedRequirement extracted_requirement = 3;
+  repeated Gap gaps = 4;
+  repeated ClarifyingQuestion questions = 5;
+  repeated GeneratedAC generated_acs = 6;
+  DomainValidation domain_validation = 7;
+
+  bool ready_for_test_generation = 8;
+  repeated string blockers = 9;
+
+  // Metadata
+  string input_type = 10;
+  string llm_provider = 11;
+  string llm_model = 12;
+  int32 tokens_used = 13;
+  float analysis_time_ms = 14;
+  string created_at = 15;
+  string updated_at = 16;
+}
+
+message DeleteHistorySessionRequest {
+  string session_id = 1;
+}
+
+message DeleteHistorySessionResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message SearchHistoryRequest {
+  string query = 1;                              // Search query (title, description)
+  int32 limit = 2;                               // Max results (default 10)
+}
+
+message SearchHistoryResponse {
+  repeated HistorySessionSummary sessions = 1;
+  int32 total_count = 2;
 }

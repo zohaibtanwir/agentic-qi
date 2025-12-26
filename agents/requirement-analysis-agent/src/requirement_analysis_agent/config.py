@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     environment: Environment = Field(
         default=Environment.DEVELOPMENT, description="Environment"
     )
-    grpc_port: int = Field(default=9004, description="gRPC server port")
+    grpc_port: int = Field(default=9003, description="gRPC server port")
     http_port: int = Field(default=8084, description="HTTP health check port")
     log_level: LogLevel = Field(default=LogLevel.INFO, description="Log level")
 
@@ -86,7 +86,7 @@ class Settings(BaseSettings):
         default="localhost", description="Test Cases Agent host"
     )
     test_cases_agent_port: int = Field(
-        default=9003, description="Test Cases Agent port"
+        default=9004, description="Test Cases Agent port"
     )
 
     # Timeouts (in seconds)

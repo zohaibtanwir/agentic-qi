@@ -2,23 +2,28 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app/src
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+# Copy project files (src needed before pip install -e .)
 COPY pyproject.toml ./
+COPY README.md ./
+COPY src/ ./src/
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -e .
+RUN pip install --upgrade pip && \
+    pip install -e .
 
-# Copy source code
-COPY src/ ./src/
+# Copy tests
 COPY tests/ ./tests/
-
-# Set Python path
-ENV PYTHONPATH=/app/src
 
 # Expose ports (gRPC: 9004, HTTP: 8084)
 EXPOSE 9004 8084

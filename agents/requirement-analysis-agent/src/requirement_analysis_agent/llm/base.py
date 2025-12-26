@@ -67,6 +67,21 @@ class LLMProvider(ABC):
         self.api_key = api_key
         self.default_model = default_model
         self._client: Optional[Any] = None
+        self._total_tokens_used: int = 0
+
+    def get_total_tokens(self) -> int:
+        """Get total tokens used across all requests."""
+        return self._total_tokens_used
+
+    def reset_token_count(self) -> int:
+        """Reset token count and return the previous value."""
+        tokens = self._total_tokens_used
+        self._total_tokens_used = 0
+        return tokens
+
+    def _track_tokens(self, tokens: int) -> None:
+        """Add tokens to the running total."""
+        self._total_tokens_used += tokens
 
     @abstractmethod
     async def initialize(self) -> None:

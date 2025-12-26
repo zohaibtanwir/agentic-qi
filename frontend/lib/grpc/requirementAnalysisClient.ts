@@ -7,6 +7,14 @@ import {
   ExportResponse as ExportResponseMsg,
   HealthCheckRequest as HealthCheckRequestMsg,
   HealthCheckResponse as HealthCheckResponseMsg,
+  ListHistoryRequest as ListHistoryRequestMsg,
+  ListHistoryResponse as ListHistoryResponseMsg,
+  GetHistorySessionRequest as GetHistorySessionRequestMsg,
+  GetHistorySessionResponse as GetHistorySessionResponseMsg,
+  DeleteHistorySessionRequest as DeleteHistorySessionRequestMsg,
+  DeleteHistorySessionResponse as DeleteHistorySessionResponseMsg,
+  SearchHistoryRequest as SearchHistoryRequestMsg,
+  SearchHistoryResponse as SearchHistoryResponseMsg,
   type AnalyzeRequest,
   type AnalyzeResponse,
   type ReanalyzeRequest,
@@ -20,6 +28,17 @@ import {
   type ExtractedRequirement,
   type DomainValidation,
   type AnalysisMetadata,
+  type ListHistoryRequest,
+  type ListHistoryResponse,
+  type GetHistorySessionRequest,
+  type GetHistorySessionResponse,
+  type DeleteHistorySessionRequest,
+  type DeleteHistorySessionResponse,
+  type SearchHistoryRequest,
+  type SearchHistoryResponse,
+  type HistorySessionSummary,
+  type HistorySession,
+  type HistoryFilters,
 } from './generated/requirement_analysis';
 
 const GRPC_WEB_URL = process.env.NEXT_PUBLIC_GRPC_WEB_URL || 'http://localhost:8085';
@@ -243,6 +262,105 @@ And the new total is displayed`,
   ];
 }
 
+// Mock data generators for history
+function generateMockHistorySessionSummary(index: number): HistorySessionSummary {
+  const grades = ['A', 'B', 'C', 'D'];
+  const inputTypes = ['free_form', 'jira', 'transcript'];
+  const titles = [
+    'User Login Feature',
+    'Add to Cart Functionality',
+    'Checkout Process',
+    'Product Search',
+    'User Registration',
+  ];
+
+  return {
+    sessionId: `session-${Date.now()}-${index}`,
+    title: titles[index % titles.length],
+    qualityScore: 60 + Math.floor(Math.random() * 35),
+    qualityGrade: grades[index % grades.length],
+    gapsCount: Math.floor(Math.random() * 8) + 1,
+    questionsCount: Math.floor(Math.random() * 5) + 1,
+    generatedAcsCount: Math.floor(Math.random() * 10) + 2,
+    readyForTests: index % 3 === 0,
+    inputType: inputTypes[index % inputTypes.length],
+    llmModel: 'claude-sonnet-4-20250514',
+    createdAt: new Date(Date.now() - index * 3600000).toISOString(),
+  };
+}
+
+function generateMockListHistoryResponse(request: ListHistoryRequest): ListHistoryResponse {
+  const limit = request.limit || 20;
+  const offset = request.offset || 0;
+  const totalCount = 25; // Mock total
+
+  const sessions: HistorySessionSummary[] = [];
+  const count = Math.min(limit, totalCount - offset);
+  for (let i = 0; i < count; i++) {
+    sessions.push(generateMockHistorySessionSummary(offset + i));
+  }
+
+  return {
+    sessions,
+    totalCount,
+    hasMore: offset + count < totalCount,
+  };
+}
+
+function generateMockGetHistorySessionResponse(request: GetHistorySessionRequest): GetHistorySessionResponse {
+  const mockResponse = generateMockAnalysisResponse({
+    requestId: request.sessionId,
+    freeForm: { text: 'Mock requirement text', context: '', title: 'Mock Session' },
+    config: {
+      includeDomainValidation: true,
+      generateAcceptanceCriteria: true,
+      generateQuestions: true,
+      llmProvider: 'anthropic',
+      domain: 'ecommerce',
+    },
+  });
+
+  return {
+    success: true,
+    session: {
+      sessionId: request.sessionId,
+      qualityScore: mockResponse.qualityScore,
+      extractedRequirement: mockResponse.extractedRequirement,
+      gaps: mockResponse.gaps,
+      questions: mockResponse.questions,
+      generatedAcs: mockResponse.generatedAcs,
+      domainValidation: mockResponse.domainValidation,
+      readyForTestGeneration: mockResponse.readyForTestGeneration,
+      blockers: mockResponse.blockers,
+      inputType: 'free_form',
+      llmProvider: 'anthropic',
+      llmModel: 'claude-sonnet-4-20250514',
+      tokensUsed: 3500,
+      analysisTimeMs: 2100,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    error: '',
+  };
+}
+
+function generateMockSearchHistoryResponse(request: SearchHistoryRequest): SearchHistoryResponse {
+  const limit = request.limit || 10;
+  const sessions: HistorySessionSummary[] = [];
+
+  // Generate mock search results
+  for (let i = 0; i < Math.min(limit, 5); i++) {
+    const session = generateMockHistorySessionSummary(i);
+    session.title = `${request.query} - Result ${i + 1}`;
+    sessions.push(session);
+  }
+
+  return {
+    sessions,
+    totalCount: sessions.length,
+  };
+}
+
 function generateMockAnalysisResponse(request: AnalyzeRequest): AnalyzeResponse {
   const inputType = request.jiraStory ? 'jira' : request.freeForm ? 'free_form' : 'transcript';
   const title = request.jiraStory?.summary ||
@@ -391,6 +509,70 @@ export const requirementAnalysisClient = {
       HealthCheckResponseMsg.decode
     );
   },
+
+  // =========================================================================
+  // History Management Methods
+  // =========================================================================
+
+  async listHistory(request: ListHistoryRequest): Promise<ListHistoryResponse> {
+    if (isMockMode()) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return generateMockListHistoryResponse(request);
+    }
+
+    return grpcWebUnaryCall<ListHistoryRequest, ListHistoryResponse>(
+      GRPC_WEB_URL,
+      'requirementanalysis.v1.RequirementAnalysisService/ListHistory',
+      request,
+      ListHistoryRequestMsg.encode,
+      ListHistoryResponseMsg.decode
+    );
+  },
+
+  async getHistorySession(request: GetHistorySessionRequest): Promise<GetHistorySessionResponse> {
+    if (isMockMode()) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return generateMockGetHistorySessionResponse(request);
+    }
+
+    return grpcWebUnaryCall<GetHistorySessionRequest, GetHistorySessionResponse>(
+      GRPC_WEB_URL,
+      'requirementanalysis.v1.RequirementAnalysisService/GetHistorySession',
+      request,
+      GetHistorySessionRequestMsg.encode,
+      GetHistorySessionResponseMsg.decode
+    );
+  },
+
+  async deleteHistorySession(request: DeleteHistorySessionRequest): Promise<DeleteHistorySessionResponse> {
+    if (isMockMode()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { success: true, error: '' };
+    }
+
+    return grpcWebUnaryCall<DeleteHistorySessionRequest, DeleteHistorySessionResponse>(
+      GRPC_WEB_URL,
+      'requirementanalysis.v1.RequirementAnalysisService/DeleteHistorySession',
+      request,
+      DeleteHistorySessionRequestMsg.encode,
+      DeleteHistorySessionResponseMsg.decode
+    );
+  },
+
+  async searchHistory(request: SearchHistoryRequest): Promise<SearchHistoryResponse> {
+    if (isMockMode()) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return generateMockSearchHistoryResponse(request);
+    }
+
+    return grpcWebUnaryCall<SearchHistoryRequest, SearchHistoryResponse>(
+      GRPC_WEB_URL,
+      'requirementanalysis.v1.RequirementAnalysisService/SearchHistory',
+      request,
+      SearchHistoryRequestMsg.encode,
+      SearchHistoryResponseMsg.decode
+    );
+  },
 };
 
 // Re-export types for convenience
@@ -408,6 +590,18 @@ export type {
   ExtractedRequirement,
   DomainValidation,
   AnalysisMetadata,
+  // History types
+  ListHistoryRequest,
+  ListHistoryResponse,
+  GetHistorySessionRequest,
+  GetHistorySessionResponse,
+  DeleteHistorySessionRequest,
+  DeleteHistorySessionResponse,
+  SearchHistoryRequest,
+  SearchHistoryResponse,
+  HistorySessionSummary,
+  HistorySession,
+  HistoryFilters,
 };
 
 export default requirementAnalysisClient;

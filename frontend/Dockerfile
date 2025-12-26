@@ -6,10 +6,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (skip postinstall - proto files already generated)
+RUN npm ci --ignore-scripts
 
-# Copy source
+# Copy source (includes pre-generated proto files)
 COPY . .
 
 # Build the application

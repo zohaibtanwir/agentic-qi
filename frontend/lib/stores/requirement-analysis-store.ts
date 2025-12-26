@@ -9,6 +9,9 @@ import {
   type ClarifyingQuestion,
   type GeneratedAC,
   type ExtractedRequirement,
+  type HistorySessionSummary,
+  type HistorySession,
+  type HistoryFilters,
 } from '../grpc/requirementAnalysisClient';
 
 // ============= Types =============
@@ -89,6 +92,17 @@ export interface RequirementAnalysisState {
 
   // Errors
   error: string | null;
+
+  // History state
+  historyEntries: HistorySessionSummary[];
+  historyTotalCount: number;
+  historyHasMore: boolean;
+  selectedSession: HistorySession | null;
+  historyFilters: HistoryFilters;
+  historySearchQuery: string;
+  isLoadingHistory: boolean;
+  isLoadingSession: boolean;
+  isSearchingHistory: boolean;
 }
 
 export interface RequirementAnalysisActions {
@@ -134,6 +148,16 @@ export interface RequirementAnalysisActions {
   // Reset actions
   resetForm: () => void;
   clearError: () => void;
+
+  // History actions
+  loadHistory: (limit?: number, offset?: number) => Promise<void>;
+  loadHistorySession: (sessionId: string) => Promise<void>;
+  deleteHistorySession: (sessionId: string) => Promise<void>;
+  searchHistory: (query: string) => Promise<void>;
+  setHistoryFilters: (filters: Partial<HistoryFilters>) => void;
+  clearHistorySearch: () => void;
+  clearSelectedSession: () => void;
+  restoreFromSession: (session: HistorySession) => void;
 }
 
 export type RequirementAnalysisStore = RequirementAnalysisState & RequirementAnalysisActions;
@@ -171,6 +195,14 @@ const defaultAnalysisConfig: AnalysisConfigState = {
   domain: 'ecommerce',
 };
 
+const defaultHistoryFilters: HistoryFilters = {
+  inputType: '',
+  qualityGrade: '',
+  readyStatus: '',
+  dateFrom: '',
+  dateTo: '',
+};
+
 const initialState: RequirementAnalysisState = {
   inputType: 'freeform',
   jiraForm: defaultJiraForm,
@@ -194,6 +226,16 @@ const initialState: RequirementAnalysisState = {
   isReanalyzing: false,
   isExporting: false,
   error: null,
+  // History state
+  historyEntries: [],
+  historyTotalCount: 0,
+  historyHasMore: false,
+  selectedSession: null,
+  historyFilters: defaultHistoryFilters,
+  historySearchQuery: '',
+  isLoadingHistory: false,
+  isLoadingSession: false,
+  isSearchingHistory: false,
 };
 
 // ============= Store =============
@@ -636,6 +678,208 @@ export const useRequirementAnalysisStore = create<RequirementAnalysisStore>()(
       clearError: () => {
         set({ error: null }, false, 'clearError');
       },
+
+      // History actions
+      loadHistory: async (limit = 20, offset = 0) => {
+        set({ isLoadingHistory: true }, false, 'loadHistory:start');
+
+        try {
+          const state = get();
+          const response = await requirementAnalysisClient.listHistory({
+            limit,
+            offset,
+            filters: state.historyFilters,
+          });
+
+          set(
+            {
+              historyEntries: offset === 0
+                ? response.sessions
+                : [...state.historyEntries, ...response.sessions],
+              historyTotalCount: response.totalCount,
+              historyHasMore: response.hasMore,
+              isLoadingHistory: false,
+            },
+            false,
+            'loadHistory:success'
+          );
+        } catch (err) {
+          set(
+            {
+              error: err instanceof Error ? err.message : 'Failed to load history',
+              isLoadingHistory: false,
+            },
+            false,
+            'loadHistory:error'
+          );
+        }
+      },
+
+      loadHistorySession: async (sessionId) => {
+        set({ isLoadingSession: true }, false, 'loadHistorySession:start');
+
+        try {
+          const response = await requirementAnalysisClient.getHistorySession({
+            sessionId,
+          });
+
+          if (response.success && response.session) {
+            set(
+              {
+                selectedSession: response.session,
+                isLoadingSession: false,
+              },
+              false,
+              'loadHistorySession:success'
+            );
+          } else {
+            set(
+              {
+                error: response.error || 'Failed to load session',
+                isLoadingSession: false,
+              },
+              false,
+              'loadHistorySession:failed'
+            );
+          }
+        } catch (err) {
+          set(
+            {
+              error: err instanceof Error ? err.message : 'Failed to load session',
+              isLoadingSession: false,
+            },
+            false,
+            'loadHistorySession:error'
+          );
+        }
+      },
+
+      deleteHistorySession: async (sessionId) => {
+        try {
+          const response = await requirementAnalysisClient.deleteHistorySession({
+            sessionId,
+          });
+
+          if (response.success) {
+            set(
+              (state) => ({
+                historyEntries: state.historyEntries.filter(e => e.sessionId !== sessionId),
+                historyTotalCount: state.historyTotalCount - 1,
+                selectedSession: state.selectedSession?.sessionId === sessionId
+                  ? null
+                  : state.selectedSession,
+              }),
+              false,
+              'deleteHistorySession:success'
+            );
+          } else {
+            set(
+              { error: response.error || 'Failed to delete session' },
+              false,
+              'deleteHistorySession:failed'
+            );
+          }
+        } catch (err) {
+          set(
+            { error: err instanceof Error ? err.message : 'Failed to delete session' },
+            false,
+            'deleteHistorySession:error'
+          );
+        }
+      },
+
+      searchHistory: async (query) => {
+        set({ isSearchingHistory: true, historySearchQuery: query }, false, 'searchHistory:start');
+
+        try {
+          const response = await requirementAnalysisClient.searchHistory({
+            query,
+            limit: 20,
+          });
+
+          set(
+            {
+              historyEntries: response.sessions,
+              historyTotalCount: response.totalCount,
+              historyHasMore: false,
+              isSearchingHistory: false,
+            },
+            false,
+            'searchHistory:success'
+          );
+        } catch (err) {
+          set(
+            {
+              error: err instanceof Error ? err.message : 'Failed to search history',
+              isSearchingHistory: false,
+            },
+            false,
+            'searchHistory:error'
+          );
+        }
+      },
+
+      setHistoryFilters: (filters) => {
+        set(
+          (state) => ({
+            historyFilters: { ...state.historyFilters, ...filters },
+          }),
+          false,
+          'setHistoryFilters'
+        );
+        // Reload history with new filters
+        get().loadHistory();
+      },
+
+      clearHistorySearch: () => {
+        set({ historySearchQuery: '' }, false, 'clearHistorySearch');
+        get().loadHistory();
+      },
+
+      clearSelectedSession: () => {
+        set({ selectedSession: null }, false, 'clearSelectedSession');
+      },
+
+      restoreFromSession: (session) => {
+        // Restore the analysis result from the history session
+        set(
+          {
+            analysisResult: {
+              requestId: session.sessionId,
+              success: true,
+              qualityScore: session.qualityScore,
+              extractedRequirement: session.extractedRequirement,
+              gaps: session.gaps,
+              questions: session.questions,
+              generatedAcs: session.generatedAcs,
+              domainValidation: session.domainValidation,
+              readyForTestGeneration: session.readyForTestGeneration,
+              blockers: session.blockers,
+              metadata: {
+                llmProvider: session.llmProvider,
+                llmModel: session.llmModel,
+                tokensUsed: session.tokensUsed,
+                analysisTimeMs: session.analysisTimeMs,
+                inputType: session.inputType,
+                agentVersion: '1.0.0',
+              },
+              error: '',
+            },
+            qualityScore: session.qualityScore || null,
+            gaps: session.gaps || [],
+            questions: session.questions || [],
+            generatedACs: session.generatedAcs || [],
+            extractedRequirement: session.extractedRequirement || null,
+            updatedTitle: session.extractedRequirement?.title || '',
+            updatedDescription: session.extractedRequirement?.description || '',
+            updatedACs: session.extractedRequirement?.originalAcs || [],
+            activeTab: 'results',
+            selectedSession: null,
+          },
+          false,
+          'restoreFromSession'
+        );
+      },
     }),
     { name: 'RequirementAnalysisStore' }
   )
@@ -680,5 +924,16 @@ export const selectQualityStats = (state: RequirementAnalysisStore) => {
     blockers: result.blockers || [],
   };
 };
+
+// History selectors
+export const selectHistoryEntries = (state: RequirementAnalysisStore) => state.historyEntries;
+export const selectHistoryTotalCount = (state: RequirementAnalysisStore) => state.historyTotalCount;
+export const selectHistoryHasMore = (state: RequirementAnalysisStore) => state.historyHasMore;
+export const selectSelectedSession = (state: RequirementAnalysisStore) => state.selectedSession;
+export const selectHistoryFilters = (state: RequirementAnalysisStore) => state.historyFilters;
+export const selectHistorySearchQuery = (state: RequirementAnalysisStore) => state.historySearchQuery;
+export const selectIsLoadingHistory = (state: RequirementAnalysisStore) => state.isLoadingHistory;
+export const selectIsLoadingSession = (state: RequirementAnalysisStore) => state.isLoadingSession;
+export const selectIsSearchingHistory = (state: RequirementAnalysisStore) => state.isSearchingHistory;
 
 export default useRequirementAnalysisStore;
