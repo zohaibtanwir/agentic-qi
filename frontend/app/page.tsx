@@ -74,10 +74,10 @@ export default function Home() {
             ]}
           />
 
-          {/* eCommerce Domain Agent */}
+          {/* Digital Domain Agent */}
           <AgentCard
-            name="eCommerce Domain Agent"
-            description="Specialized agent with deep eCommerce domain knowledge and validation"
+            name="Digital Domain Agent"
+            description="Specialized agent with deep digital domain knowledge and validation"
             status="operational"
             link="/ecommerce"
             features={[
