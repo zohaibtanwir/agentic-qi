@@ -1,6 +1,7 @@
 'use client';
 
-import { useEcommerceStore, type GenerationMethod } from '@/lib/stores/ecommerce-store';
+import { useState } from 'react';
+import { useEcommerceStore, type GenerationMethod, type HistoryEntry } from '@/lib/stores/ecommerce-store';
 
 const GENERATION_METHODS: { id: GenerationMethod; label: string; description: string }[] = [
   { id: 'LLM', label: 'LLM', description: 'AI-powered intelligent generation using Claude' },
@@ -18,6 +19,14 @@ export function GenerateView() {
   const isGenerating = useEcommerceStore((state) => state.isGenerating);
   const generateTestData = useEcommerceStore((state) => state.generateTestData);
   const historyEntries = useEcommerceStore((state) => state.historyEntries);
+  const deleteHistoryEntry = useEcommerceStore((state) => state.deleteHistoryEntry);
+
+  // State for expanded history entry
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+
+  const toggleHistoryEntry = (entryId: string) => {
+    setExpandedEntryId(expandedEntryId === entryId ? null : entryId);
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,44 +301,201 @@ export function GenerateView() {
         <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-xl overflow-hidden">
           <div className="p-4 border-b border-[var(--border-default)]">
             <h3 className="font-semibold text-[var(--text-primary)]">Generation History</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Click on an entry to view details</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-[var(--surface-secondary)]">
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[var(--text-muted)]">Entity</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[var(--text-muted)]">Records</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[var(--text-muted)]">Workflow</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[var(--text-muted)]">Options</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[var(--text-muted)]">Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-default)]">
-                {historyEntries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-[var(--surface-secondary)]">
-                    <td className="px-4 py-3 text-sm text-[var(--text-primary)] font-medium capitalize">{entry.entity}</td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{entry.recordCount}</td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)] capitalize">{entry.workflow || '-'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {entry.includeEdgeCases && (
-                          <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded">Edge Cases</span>
-                        )}
-                        {entry.includeRelationships && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Relationships</span>
-                        )}
-                        {entry.validateRules && (
-                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">Validated</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-muted)]">
+          <div className="divide-y divide-[var(--border-default)]">
+            {historyEntries.map((entry) => (
+              <div key={entry.id}>
+                {/* History Row - Clickable */}
+                <div
+                  onClick={() => toggleHistoryEntry(entry.id)}
+                  className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
+                    expandedEntryId === entry.id
+                      ? 'bg-[var(--accent-default)]/5'
+                      : 'hover:bg-[var(--surface-secondary)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    {/* Expand Icon */}
+                    <svg
+                      className={`w-4 h-4 text-[var(--text-muted)] transition-transform flex-shrink-0 ${
+                        expandedEntryId === entry.id ? 'rotate-90' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+
+                    {/* Entity */}
+                    <span className="text-sm text-[var(--text-primary)] font-medium capitalize min-w-[100px]">
+                      {entry.entity}
+                    </span>
+
+                    {/* Records */}
+                    <span className="text-sm text-[var(--text-secondary)] min-w-[80px]">
+                      {entry.recordCount} records
+                    </span>
+
+                    {/* Workflow */}
+                    <span className="text-sm text-[var(--text-muted)] capitalize min-w-[100px]">
+                      {entry.workflow || 'No workflow'}
+                    </span>
+
+                    {/* Options Tags */}
+                    <div className="flex flex-wrap gap-1 flex-1">
+                      {entry.includeEdgeCases && (
+                        <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded">Edge Cases</span>
+                      )}
+                      {entry.includeRelationships && (
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Relationships</span>
+                      )}
+                      {entry.validateRules && (
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">Validated</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Timestamp & Delete */}
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs text-[var(--text-muted)]">
                       {new Date(entry.timestamp).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteHistoryEntry(entry.id);
+                      }}
+                      className="p-1 text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                      title="Delete entry"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expanded Details Panel */}
+                {expandedEntryId === entry.id && (
+                  <div className="bg-[var(--surface-secondary)] border-t border-[var(--border-default)] p-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Input Parameters */}
+                      <div className="bg-[var(--surface-primary)] rounded-lg p-4 border border-[var(--border-default)]">
+                        <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                          <svg className="w-4 h-4 text-[var(--accent-default)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Input Parameters
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-[var(--text-muted)]">Entity:</span>
+                            <span className="text-[var(--text-primary)] font-medium capitalize">{entry.entity}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--text-muted)]">Requested Count:</span>
+                            <span className="text-[var(--text-primary)]">{entry.count}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--text-muted)]">Generated Count:</span>
+                            <span className="text-[var(--text-primary)]">{entry.recordCount}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--text-muted)]">Workflow:</span>
+                            <span className="text-[var(--text-primary)] capitalize">{entry.workflow || 'None'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--text-muted)]">Edge Cases:</span>
+                            <span className={entry.includeEdgeCases ? 'text-green-600' : 'text-[var(--text-muted)]'}>
+                              {entry.includeEdgeCases ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--text-muted)]">Relationships:</span>
+                            <span className={entry.includeRelationships ? 'text-green-600' : 'text-[var(--text-muted)]'}>
+                              {entry.includeRelationships ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--text-muted)]">Validated:</span>
+                            <span className={entry.validateRules ? 'text-green-600' : 'text-[var(--text-muted)]'}>
+                              {entry.validateRules ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                          {entry.customContext && (
+                            <div className="mt-3 pt-3 border-t border-[var(--border-default)]">
+                              <span className="text-[var(--text-muted)] block mb-1">Additional Context:</span>
+                              <p className="text-xs text-[var(--text-secondary)] bg-[var(--surface-secondary)] p-2 rounded italic">
+                                &ldquo;{entry.customContext}&rdquo;
+                              </p>
+                            </div>
+                          )}
+                          {entry.domainContext && (
+                            <div className="mt-3 pt-3 border-t border-[var(--border-default)]">
+                              <span className="text-[var(--text-muted)] block mb-1">Domain Context:</span>
+                              <p className="text-xs text-[var(--text-secondary)] bg-[var(--surface-secondary)] p-2 rounded">
+                                {entry.domainContext}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Generated Data */}
+                      <div className="bg-[var(--surface-primary)] rounded-lg p-4 border border-[var(--border-default)]">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                            <svg className="w-4 h-4 text-[var(--accent-default)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                            </svg>
+                            Generated Data
+                          </h4>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(formatJsonData(entry.data));
+                              }}
+                              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded transition-colors"
+                              title="Copy to clipboard"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => {
+                                const blob = new Blob([formatJsonData(entry.data)], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${entry.entity}-${entry.timestamp}.json`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                              }}
+                              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded transition-colors"
+                              title="Download JSON"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="max-h-[300px] overflow-auto">
+                          <pre className="text-xs text-[var(--text-secondary)] font-mono whitespace-pre-wrap bg-[var(--surface-secondary)] p-3 rounded">
+                            {formatJsonData(entry.data)}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -50,6 +50,7 @@ export interface HistoryEntry {
   includeEdgeCases: boolean;
   includeRelationships: boolean;
   validateRules: boolean;
+  customContext: string;
   data: string;
   domainContext: string;
 }
@@ -501,6 +502,7 @@ export const useEcommerceStore = create<EcommerceStore>()(
                 includeEdgeCases: state.generateForm.includeEdgeCases,
                 includeRelationships: state.generateForm.includeRelationships,
                 validateRules: state.generateForm.validateRules,
+                customContext: state.generateForm.customContext || '',
                 data: response.data,
                 domainContext: response.metadata?.domainContextUsed || '',
               };

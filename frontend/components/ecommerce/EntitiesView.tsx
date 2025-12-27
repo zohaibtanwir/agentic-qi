@@ -2,6 +2,15 @@
 
 import { useEcommerceStore, type EntityCategory } from '@/lib/stores/ecommerce-store';
 
+// Lightning bolt icon for Generate button
+function ZapIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+  );
+}
+
 const CATEGORIES: { id: EntityCategory; label: string }[] = [
   { id: 'all', label: 'All Entities' },
   { id: 'core', label: 'Core' },
@@ -21,6 +30,16 @@ export function EntitiesView() {
   const clearSelectedEntity = useEcommerceStore((state) => state.clearSelectedEntity);
   const isLoadingEntities = useEcommerceStore((state) => state.isLoadingEntities);
   const isLoadingEntityDetails = useEcommerceStore((state) => state.isLoadingEntityDetails);
+  const setActiveView = useEcommerceStore((state) => state.setActiveView);
+  const setGenerateFormField = useEcommerceStore((state) => state.setGenerateFormField);
+
+  // Navigate to Generate view with the selected entity pre-filled
+  const handleGenerateData = () => {
+    if (selectedEntity) {
+      setGenerateFormField('entity', selectedEntity.name);
+      setActiveView('generate');
+    }
+  };
 
   const filteredEntities = entityCategory === 'all'
     ? entities
@@ -104,14 +123,24 @@ export function EntitiesView() {
               )}
             </h3>
             {selectedEntity && (
-              <button
-                onClick={clearSelectedEntity}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleGenerateData}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-default)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors text-sm font-medium"
+                  title="Generate test data for this entity"
+                >
+                  <ZapIcon className="w-4 h-4" />
+                  Generate Data
+                </button>
+                <button
+                  onClick={clearSelectedEntity}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             )}
           </div>
           <div className="max-h-[500px] overflow-y-auto p-4">
