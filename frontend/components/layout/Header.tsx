@@ -12,7 +12,7 @@ export function Header() {
     { href: '/requirement-analysis', label: 'Requirements' },
     { href: '/test-cases', label: 'Test Cases' },
     { href: '/test-data', label: 'Test Data' },
-    { href: '/ecommerce', label: 'eCommerce' },
+    { href: '/ecommerce', label: 'Digital' },
     { href: '/analytics', label: 'Analytics' },
     { href: '/developers', label: 'API Docs' },
   ];

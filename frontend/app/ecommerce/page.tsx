@@ -57,9 +57,9 @@ export default function EcommercePage() {
   useEffect(() => {
     if (healthStatus !== prevHealthStatusRef.current && prevHealthStatusRef.current !== 'unknown') {
       if (healthStatus === 'healthy') {
-        toast.success('eCommerce service is healthy');
+        toast.success('Digital service is healthy');
       } else if (healthStatus === 'unhealthy') {
-        toast.warning('eCommerce service is unhealthy');
+        toast.warning('Digital service is unhealthy');
       }
     }
     prevHealthStatusRef.current = healthStatus;
@@ -100,7 +100,7 @@ export default function EcommercePage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-[var(--text-primary)]">
-                  eCommerce Domain Agent
+                  Digital Domain Agent
                 </h1>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
@@ -112,7 +112,7 @@ export default function EcommercePage() {
               </div>
             </div>
             <p className="text-[var(--text-secondary)] mt-3 max-w-2xl">
-              Explore e-commerce domain knowledge, entities, workflows, and generate
+              Explore digital domain knowledge, entities, workflows, and generate
               context-aware test data with business rule intelligence.
             </p>
           </div>
