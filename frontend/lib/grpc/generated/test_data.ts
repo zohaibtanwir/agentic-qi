@@ -217,6 +217,8 @@ export interface GenerateRequest {
   generationMethod: GenerationMethod;
   /** Custom schema from domain agent */
   customSchema: string;
+  /** Configuration for data masking */
+  maskingConfig: MaskingConfig | undefined;
 }
 
 export interface Schema {
@@ -251,6 +253,14 @@ export interface FieldConstraint {
   format?: string | undefined;
 }
 
+/** Configuration for data masking (PII protection) */
+export interface MaskingConfig {
+  /** Global toggle to enable/disable masking */
+  enabled: boolean;
+  /** List of field names to mask */
+  maskedFields: string[];
+}
+
 export interface Scenario {
   name: string;
   count: number;
@@ -266,10 +276,13 @@ export interface Scenario_OverridesEntry {
 export interface GenerateResponse {
   requestId: string;
   success: boolean;
+  /** Masked data (if masking enabled) */
   data: string;
   recordCount: number;
   metadata: GenerationMetadata | undefined;
   error: string;
+  /** Original unmasked data (for preview toggle) */
+  unmaskedData: string;
 }
 
 export interface GenerationMetadata {
@@ -278,6 +291,10 @@ export interface GenerationMetadata {
   generationTimeMs: number;
   coherenceScore: number;
   scenarioCounts: { [key: string]: number };
+  /** Whether masking was applied */
+  dataMasked: boolean;
+  /** Number of field instances masked */
+  fieldsMaskedCount: number;
 }
 
 export interface GenerationMetadata_ScenarioCountsEntry {
@@ -347,6 +364,7 @@ function createBaseGenerateRequest(): GenerateRequest {
     inlineSchema: "",
     generationMethod: 0,
     customSchema: "",
+    maskingConfig: undefined,
   };
 }
 
@@ -402,6 +420,9 @@ export const GenerateRequest: MessageFns<GenerateRequest> = {
     }
     if (message.customSchema !== "") {
       writer.uint32(138).string(message.customSchema);
+    }
+    if (message.maskingConfig !== undefined) {
+      MaskingConfig.encode(message.maskingConfig, writer.uint32(146).fork()).join();
     }
     return writer;
   },
@@ -549,6 +570,14 @@ export const GenerateRequest: MessageFns<GenerateRequest> = {
           message.customSchema = reader.string();
           continue;
         }
+        case 18: {
+          if (tag !== 146) {
+            break;
+          }
+
+          message.maskingConfig = MaskingConfig.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -579,6 +608,7 @@ export const GenerateRequest: MessageFns<GenerateRequest> = {
       inlineSchema: isSet(object.inlineSchema) ? globalThis.String(object.inlineSchema) : "",
       generationMethod: isSet(object.generationMethod) ? generationMethodFromJSON(object.generationMethod) : 0,
       customSchema: isSet(object.customSchema) ? globalThis.String(object.customSchema) : "",
+      maskingConfig: isSet(object.maskingConfig) ? MaskingConfig.fromJSON(object.maskingConfig) : undefined,
     };
   },
 
@@ -635,6 +665,9 @@ export const GenerateRequest: MessageFns<GenerateRequest> = {
     if (message.customSchema !== "") {
       obj.customSchema = message.customSchema;
     }
+    if (message.maskingConfig !== undefined) {
+      obj.maskingConfig = MaskingConfig.toJSON(message.maskingConfig);
+    }
     return obj;
   },
 
@@ -664,6 +697,9 @@ export const GenerateRequest: MessageFns<GenerateRequest> = {
     message.inlineSchema = object.inlineSchema ?? "";
     message.generationMethod = object.generationMethod ?? 0;
     message.customSchema = object.customSchema ?? "";
+    message.maskingConfig = (object.maskingConfig !== undefined && object.maskingConfig !== null)
+      ? MaskingConfig.fromPartial(object.maskingConfig)
+      : undefined;
     return message;
   },
 };
@@ -1196,6 +1232,84 @@ export const FieldConstraint: MessageFns<FieldConstraint> = {
   },
 };
 
+function createBaseMaskingConfig(): MaskingConfig {
+  return { enabled: false, maskedFields: [] };
+}
+
+export const MaskingConfig: MessageFns<MaskingConfig> = {
+  encode(message: MaskingConfig, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.enabled !== false) {
+      writer.uint32(8).bool(message.enabled);
+    }
+    for (const v of message.maskedFields) {
+      writer.uint32(18).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MaskingConfig {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMaskingConfig();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.enabled = reader.bool();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.maskedFields.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MaskingConfig {
+    return {
+      enabled: isSet(object.enabled) ? globalThis.Boolean(object.enabled) : false,
+      maskedFields: globalThis.Array.isArray(object?.maskedFields)
+        ? object.maskedFields.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: MaskingConfig): unknown {
+    const obj: any = {};
+    if (message.enabled !== false) {
+      obj.enabled = message.enabled;
+    }
+    if (message.maskedFields?.length) {
+      obj.maskedFields = message.maskedFields;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MaskingConfig>): MaskingConfig {
+    return MaskingConfig.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MaskingConfig>): MaskingConfig {
+    const message = createBaseMaskingConfig();
+    message.enabled = object.enabled ?? false;
+    message.maskedFields = object.maskedFields?.map((e) => e) || [];
+    return message;
+  },
+};
+
 function createBaseScenario(): Scenario {
   return { name: "", count: 0, overrides: {}, description: "" };
 }
@@ -1403,7 +1517,7 @@ export const Scenario_OverridesEntry: MessageFns<Scenario_OverridesEntry> = {
 };
 
 function createBaseGenerateResponse(): GenerateResponse {
-  return { requestId: "", success: false, data: "", recordCount: 0, metadata: undefined, error: "" };
+  return { requestId: "", success: false, data: "", recordCount: 0, metadata: undefined, error: "", unmaskedData: "" };
 }
 
 export const GenerateResponse: MessageFns<GenerateResponse> = {
@@ -1425,6 +1539,9 @@ export const GenerateResponse: MessageFns<GenerateResponse> = {
     }
     if (message.error !== "") {
       writer.uint32(50).string(message.error);
+    }
+    if (message.unmaskedData !== "") {
+      writer.uint32(58).string(message.unmaskedData);
     }
     return writer;
   },
@@ -1484,6 +1601,14 @@ export const GenerateResponse: MessageFns<GenerateResponse> = {
           message.error = reader.string();
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.unmaskedData = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1501,6 +1626,7 @@ export const GenerateResponse: MessageFns<GenerateResponse> = {
       recordCount: isSet(object.recordCount) ? globalThis.Number(object.recordCount) : 0,
       metadata: isSet(object.metadata) ? GenerationMetadata.fromJSON(object.metadata) : undefined,
       error: isSet(object.error) ? globalThis.String(object.error) : "",
+      unmaskedData: isSet(object.unmaskedData) ? globalThis.String(object.unmaskedData) : "",
     };
   },
 
@@ -1524,6 +1650,9 @@ export const GenerateResponse: MessageFns<GenerateResponse> = {
     if (message.error !== "") {
       obj.error = message.error;
     }
+    if (message.unmaskedData !== "") {
+      obj.unmaskedData = message.unmaskedData;
+    }
     return obj;
   },
 
@@ -1540,12 +1669,21 @@ export const GenerateResponse: MessageFns<GenerateResponse> = {
       ? GenerationMetadata.fromPartial(object.metadata)
       : undefined;
     message.error = object.error ?? "";
+    message.unmaskedData = object.unmaskedData ?? "";
     return message;
   },
 };
 
 function createBaseGenerationMetadata(): GenerationMetadata {
-  return { generationPath: "", llmTokensUsed: 0, generationTimeMs: 0, coherenceScore: 0, scenarioCounts: {} };
+  return {
+    generationPath: "",
+    llmTokensUsed: 0,
+    generationTimeMs: 0,
+    coherenceScore: 0,
+    scenarioCounts: {},
+    dataMasked: false,
+    fieldsMaskedCount: 0,
+  };
 }
 
 export const GenerationMetadata: MessageFns<GenerationMetadata> = {
@@ -1565,6 +1703,12 @@ export const GenerationMetadata: MessageFns<GenerationMetadata> = {
     Object.entries(message.scenarioCounts).forEach(([key, value]) => {
       GenerationMetadata_ScenarioCountsEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).join();
     });
+    if (message.dataMasked !== false) {
+      writer.uint32(48).bool(message.dataMasked);
+    }
+    if (message.fieldsMaskedCount !== 0) {
+      writer.uint32(56).int32(message.fieldsMaskedCount);
+    }
     return writer;
   },
 
@@ -1618,6 +1762,22 @@ export const GenerationMetadata: MessageFns<GenerationMetadata> = {
           }
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.dataMasked = reader.bool();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.fieldsMaskedCount = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1639,6 +1799,8 @@ export const GenerationMetadata: MessageFns<GenerationMetadata> = {
           return acc;
         }, {})
         : {},
+      dataMasked: isSet(object.dataMasked) ? globalThis.Boolean(object.dataMasked) : false,
+      fieldsMaskedCount: isSet(object.fieldsMaskedCount) ? globalThis.Number(object.fieldsMaskedCount) : 0,
     };
   },
 
@@ -1665,6 +1827,12 @@ export const GenerationMetadata: MessageFns<GenerationMetadata> = {
         });
       }
     }
+    if (message.dataMasked !== false) {
+      obj.dataMasked = message.dataMasked;
+    }
+    if (message.fieldsMaskedCount !== 0) {
+      obj.fieldsMaskedCount = Math.round(message.fieldsMaskedCount);
+    }
     return obj;
   },
 
@@ -1686,6 +1854,8 @@ export const GenerationMetadata: MessageFns<GenerationMetadata> = {
       },
       {},
     );
+    message.dataMasked = object.dataMasked ?? false;
+    message.fieldsMaskedCount = object.fieldsMaskedCount ?? 0;
     return message;
   },
 };

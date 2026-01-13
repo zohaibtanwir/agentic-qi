@@ -365,8 +365,11 @@ export const testDataClient = {
             acc[s.name] = s.count;
             return acc;
           }, {} as Record<string, number>),
+          dataMasked: false,
+          fieldsMaskedCount: 0,
         },
         error: '',
+        unmaskedData: '',
       };
     }
 

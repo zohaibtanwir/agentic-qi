@@ -377,6 +377,12 @@ export const useTestDataStore = create<TestDataStore>()(
               inlineSchema: '',
               generationMethod: state.form.generationMethod,
               customSchema: state.form.customSchema,
+              maskingConfig: state.form.maskingConfig.enabled
+                ? {
+                    enabled: true,
+                    maskedFields: state.form.maskingConfig.maskedFields,
+                  }
+                : undefined,
             };
 
             const response = await testDataClient.generateData(request);
