@@ -12,16 +12,24 @@ export function DataPreview() {
     lastResponse,
     isGenerating,
     clearGeneratedData,
+    showUnmasked,
+    setShowUnmasked,
   } = useTestDataStore();
 
   const toast = useToastActions();
   const [activeTab, setActiveTab] = useState<PreviewTab>('json');
   const [copied, setCopied] = useState(false);
 
+  // Determine which data to display based on masking toggle
+  const dataMasked = lastResponse?.metadata?.dataMasked;
+  const displayData = dataMasked && showUnmasked && lastResponse?.unmaskedData
+    ? lastResponse.unmaskedData
+    : generatedData;
+
   const handleCopy = async () => {
-    if (!generatedData) return;
+    if (!displayData) return;
     try {
-      await navigator.clipboard.writeText(generatedData);
+      await navigator.clipboard.writeText(displayData);
       setCopied(true);
       toast.success('Copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
@@ -31,13 +39,14 @@ export function DataPreview() {
   };
 
   const handleDownload = () => {
-    if (!generatedData) return;
+    if (!displayData) return;
     try {
-      const blob = new Blob([generatedData], { type: 'application/json' });
+      const blob = new Blob([displayData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `test-data-${Date.now()}.json`;
+      const suffix = dataMasked && !showUnmasked ? '-masked' : '';
+      a.download = `test-data${suffix}-${Date.now()}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -56,9 +65,9 @@ export function DataPreview() {
   // Parse data for table view
   let parsedData: Record<string, unknown>[] = [];
   let parseError = false;
-  if (generatedData) {
+  if (displayData) {
     try {
-      parsedData = JSON.parse(generatedData);
+      parsedData = JSON.parse(displayData);
       if (!Array.isArray(parsedData)) {
         parsedData = [parsedData];
       }
@@ -78,9 +87,51 @@ export function DataPreview() {
       {/* Header */}
       <div className="border-b border-[var(--border-default)]">
         <div className="flex items-center justify-between px-6 pt-4 pb-0">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Preview</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Preview</h2>
+            {dataMasked && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-[var(--accent-default)]/10 text-[var(--accent-default)] border border-[var(--accent-default)]/20 rounded">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                {lastResponse?.metadata?.fieldsMaskedCount || 0} fields masked
+              </span>
+            )}
+          </div>
           {generatedData && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              {/* Masked/Unmasked Toggle */}
+              {dataMasked && lastResponse?.unmaskedData && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showUnmasked}
+                      onChange={(e) => setShowUnmasked(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[var(--accent-default)]/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                  </label>
+                  <span className="text-xs font-medium text-[var(--text-secondary)] flex items-center gap-1">
+                    {showUnmasked ? (
+                      <>
+                        <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                        Unmasked
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3 h-3 text-[var(--accent-default)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        Masked
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
               <button
                 onClick={handleCopy}
                 className="p-2 text-gray-500 hover:text-[var(--accent-default)] transition-colors"
@@ -114,6 +165,7 @@ export function DataPreview() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
+              </div>
             </div>
           )}
         </div>
@@ -149,7 +201,7 @@ export function DataPreview() {
           <>
             {activeTab === 'json' && (
               <pre className="bg-gray-50 rounded-lg p-4 overflow-auto max-h-[500px] text-sm font-mono text-[var(--text-secondary)]">
-                {generatedData}
+                {displayData}
               </pre>
             )}
 

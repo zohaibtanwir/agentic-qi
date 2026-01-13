@@ -34,6 +34,7 @@ message GenerateRequest {
   string inline_schema = 15;
   GenerationMethod generation_method = 16;  // Method for generating data
   string custom_schema = 17;  // Custom schema from domain agent
+  MaskingConfig masking_config = 18;  // Configuration for data masking
 }
 
 message Schema {
@@ -79,6 +80,12 @@ message FieldConstraint {
   optional string format = 7;
 }
 
+// Configuration for data masking (PII protection)
+message MaskingConfig {
+  bool enabled = 1;                    // Global toggle to enable/disable masking
+  repeated string masked_fields = 2;   // List of field names to mask
+}
+
 message Scenario {
   string name = 1;
   int32 count = 2;
@@ -102,10 +109,11 @@ enum OutputFormat {
 message GenerateResponse {
   string request_id = 1;
   bool success = 2;
-  string data = 3;
+  string data = 3;  // Masked data (if masking enabled)
   int32 record_count = 4;
   GenerationMetadata metadata = 5;
   string error = 6;
+  string unmasked_data = 7;  // Original unmasked data (for preview toggle)
 }
 
 message GenerationMetadata {
@@ -114,6 +122,8 @@ message GenerationMetadata {
   float generation_time_ms = 3;
   float coherence_score = 4;
   map<string, int32> scenario_counts = 5;
+  bool data_masked = 6;  // Whether masking was applied
+  int32 fields_masked_count = 7;  // Number of field instances masked
 }
 
 message DataChunk {

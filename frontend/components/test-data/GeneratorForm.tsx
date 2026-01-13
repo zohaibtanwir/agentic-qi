@@ -5,10 +5,12 @@ import { useToastActions } from '@/components/ui/Toast';
 import { BasicConfigTab } from './BasicConfigTab';
 import { ScenariosTab } from './ScenariosTab';
 import { OutputTab } from './OutputTab';
+import { MaskingTab } from './MaskingTab';
 
 const tabs = [
   { id: 'options' as const, label: 'Options' },
   { id: 'scenarios' as const, label: 'Scenarios' },
+  { id: 'masking' as const, label: 'Masking' },
   { id: 'output' as const, label: 'Output' },
 ];
 
@@ -71,6 +73,7 @@ export function GeneratorForm() {
       <div className="flex-1 overflow-auto p-6">
         {activeGeneratorTab === 'options' && <BasicConfigTab />}
         {activeGeneratorTab === 'scenarios' && <ScenariosTab />}
+        {activeGeneratorTab === 'masking' && <MaskingTab />}
         {activeGeneratorTab === 'output' && <OutputTab />}
       </div>
 

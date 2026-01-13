@@ -12,6 +12,33 @@ import {
 
 // ============= Types =============
 
+export interface MaskingConfig {
+  enabled: boolean;
+  maskedFields: string[];
+}
+
+// Extended metadata type with masking fields
+export interface ExtendedMetadata {
+  generationPath: string;
+  llmTokensUsed: number;
+  generationTimeMs: number;
+  coherenceScore: number;
+  scenarioCounts: { [key: string]: number };
+  dataMasked?: boolean;
+  fieldsMaskedCount?: number;
+}
+
+// Extended response type with masking fields
+export interface ExtendedGenerateResponse {
+  requestId: string;
+  success: boolean;
+  data: string;
+  recordCount: number;
+  metadata?: ExtendedMetadata;
+  error: string;
+  unmaskedData?: string;
+}
+
 export interface GeneratorFormState {
   domain: string;
   entity: string;
@@ -23,6 +50,7 @@ export interface GeneratorFormState {
   useCache: boolean;
   productionLike: boolean;
   defectTriggering: boolean;
+  maskingConfig: MaskingConfig;
 }
 
 export interface HistoryEntry {
@@ -46,7 +74,7 @@ export interface ScenarioItem extends Scenario {
   id: string;
 }
 
-export type GeneratorTab = 'options' | 'scenarios' | 'schema' | 'output';
+export type GeneratorTab = 'options' | 'scenarios' | 'masking' | 'schema' | 'output';
 export type PreviewTab = 'json' | 'table' | 'stats';
 
 export interface GenerationStats {
@@ -67,11 +95,12 @@ export interface TestDataState {
   activeGeneratorTab: GeneratorTab;
   activePreviewTab: PreviewTab;
   sidebarCollapsed: boolean;
+  showUnmasked: boolean;  // For preview toggle
 
   // Data
   schemas: SchemaInfo[];
   generatedData: string;
-  lastResponse: GenerateResponse | null;
+  lastResponse: ExtendedGenerateResponse | null;
   generationStats: GenerationStats;
 
   // Loading states
@@ -100,6 +129,12 @@ export interface TestDataActions {
   setActiveGeneratorTab: (tab: GeneratorTab) => void;
   setActivePreviewTab: (tab: PreviewTab) => void;
   toggleSidebar: () => void;
+  setShowUnmasked: (show: boolean) => void;
+
+  // Masking actions
+  setMaskingEnabled: (enabled: boolean) => void;
+  toggleFieldMasking: (fieldName: string) => void;
+  clearMaskedFields: () => void;
 
   // Data actions
   loadSchemas: (domain?: string) => Promise<void>;
@@ -130,6 +165,10 @@ const defaultForm: GeneratorFormState = {
   useCache: false,
   productionLike: false,
   defectTriggering: false,
+  maskingConfig: {
+    enabled: false,
+    maskedFields: [],
+  },
 };
 
 const defaultStats: GenerationStats = {
@@ -145,6 +184,7 @@ const initialState: TestDataState = {
   activeGeneratorTab: 'options',
   activePreviewTab: 'json',
   sidebarCollapsed: false,
+  showUnmasked: false,
   schemas: [],
   generatedData: '',
   lastResponse: null,
@@ -231,6 +271,59 @@ export const useTestDataStore = create<TestDataStore>()(
             (state) => ({ sidebarCollapsed: !state.sidebarCollapsed }),
             false,
             'toggleSidebar'
+          );
+        },
+
+        setShowUnmasked: (show) => {
+          set({ showUnmasked: show }, false, 'setShowUnmasked');
+        },
+
+        // Masking actions
+        setMaskingEnabled: (enabled) => {
+          set(
+            (state) => ({
+              form: {
+                ...state.form,
+                maskingConfig: { ...state.form.maskingConfig, enabled },
+              },
+            }),
+            false,
+            'setMaskingEnabled'
+          );
+        },
+
+        toggleFieldMasking: (fieldName) => {
+          set(
+            (state) => {
+              const currentFields = state.form.maskingConfig.maskedFields;
+              const isCurrentlyMasked = currentFields.includes(fieldName);
+              return {
+                form: {
+                  ...state.form,
+                  maskingConfig: {
+                    ...state.form.maskingConfig,
+                    maskedFields: isCurrentlyMasked
+                      ? currentFields.filter((f) => f !== fieldName)
+                      : [...currentFields, fieldName],
+                  },
+                },
+              };
+            },
+            false,
+            'toggleFieldMasking'
+          );
+        },
+
+        clearMaskedFields: () => {
+          set(
+            (state) => ({
+              form: {
+                ...state.form,
+                maskingConfig: { ...state.form.maskingConfig, maskedFields: [] },
+              },
+            }),
+            false,
+            'clearMaskedFields'
           );
         },
 
