@@ -38,19 +38,27 @@ A complete data masking feature for PII protection in the Test Data Agent:
 - `cc85217` (test-data-agent): feat: Add data masking feature for PII protection
 - `12f0c23` (main): feat: Add data masking UI to main frontend
 - `db1eb76` (main): chore: Update Beads issues - close data masking tasks
+- `831eb83` (main): fix: Wire maskingConfig to gRPC request for data masking
 
 ### Beads Tasks
 All 14 data masking tasks closed (qa-platform-e31 through qa-platform-dsg)
 
-## Pending: Chrome UI Testing
-Need to test the masking UI using Chrome:
-1. Navigate to `http://localhost:3000/test-data`
-2. Click on "Masking" tab
-3. Enable masking toggle
-4. Select fields to mask (email, phone, first_name, last_name)
-5. Click Generate
-6. Verify masked data appears
-7. Toggle "Show Unmasked" to compare
+## Completed: Chrome UI Testing (2026-01-13)
+
+### Test Results
+All test scenarios passed:
+1. Masking tab displays with global toggle and per-field selection
+2. PII field detection works (email, phone, first_name, last_name suggested)
+3. Data generation with masking enabled - 40 fields masked across 10 records
+4. Partial masking format preserved (e.g., `h*************@e******.com`)
+5. Masked/Unmasked toggle switches views correctly
+
+### Fixes Applied During Testing
+- **Frontend Docker container**: Rebuilt to include latest masking UI code
+- **Zustand localStorage**: Cleared stale state missing `maskingConfig`
+- **test-data-store.ts**: Added `maskingConfig` to `GenerateRequest`
+- **test_data.ts**: Regenerated protobuf with `MaskingConfig.encode()` support
+- **testDataClient.ts**: Added `dataMasked`, `fieldsMaskedCount`, `unmaskedData` to mock
 
 ## Project Structure
 - `frontend/` - Main Next.js frontend (port 3000)
