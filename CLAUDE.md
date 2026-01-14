@@ -45,7 +45,7 @@ All 14 data masking tasks closed (qa-platform-e31 through qa-platform-dsg)
 
 ## Completed: Chrome UI Testing (2026-01-13)
 
-### Test Results
+### Data Masking Test Results
 All test scenarios passed:
 1. Masking tab displays with global toggle and per-field selection
 2. PII field detection works (email, phone, first_name, last_name suggested)
@@ -59,6 +59,57 @@ All test scenarios passed:
 - **test-data-store.ts**: Added `maskingConfig` to `GenerateRequest`
 - **test_data.ts**: Regenerated protobuf with `MaskingConfig.encode()` support
 - **testDataClient.ts**: Added `dataMasked`, `fieldsMaskedCount`, `unmaskedData` to mock
+
+## Completed: Full Agent Integration Testing (2026-01-14)
+
+### Test Data Agent - LLM Backend Test
+- **URL**: `http://localhost:3000/test-data`
+- **Entity**: Customer
+- **Generation Method**: LLM (AI-powered with context awareness)
+- **Context**: "Generate realistic e-commerce customers for testing checkout flow with various loyalty tiers"
+
+**Results**:
+| Metric | Value |
+|--------|-------|
+| Records Generated | 10 |
+| Generation Time | 27.01s |
+| Coherence Score | 94.4% |
+| Generation Method | llm |
+
+**Sample Generated Data**:
+- `sarah.martinez@gmail.com` - Gold tier, 4850 loyalty points, $2847.92 lifetime value
+- `michael.chen.work@outlook.com` - realistic e-commerce customer profiles
+
+### Requirement Analysis Agent - LLM Backend Test
+- **URL**: `http://localhost:3000/requirement-analysis`
+- **Title**: "Shopping Cart Checkout Feature"
+- **Requirement**: User story for checkout with multiple payment methods, discount codes, tax calculation
+
+**Quality Score: 65 (D)**
+| Dimension | Score | Grade |
+|-----------|-------|-------|
+| Clarity | 70 | C |
+| Completeness | 55 | F |
+| Testability | 60 | D |
+| Consistency | 85 | B |
+
+**Analysis Output**:
+- **Detected Gaps**: 11 (including missing acceptance criteria for payment methods)
+- **Clarifying Questions**: Generated with suggested answers (e.g., discount code validation rules)
+- **Acceptance Criteria**: 4 auto-generated with confidence scores (70-85%)
+- **Domain Entities Extracted**: customer, shopping cart, payment methods, discount codes, tax, shipping address, order summary
+
+**Backend Metrics**:
+| Metric | Value |
+|--------|-------|
+| Model | claude-sonnet-4-20250514 |
+| Tokens Used | 8,284 |
+| Processing Time | 60.213s |
+
+### Summary
+Both agents fully operational with real gRPC backend and LLM integration:
+- Test Data Agent: Fast generation (27s), high coherence (94.4%)
+- Requirement Analysis Agent: Comprehensive analysis with Claude Sonnet 4
 
 ## Project Structure
 - `frontend/` - Main Next.js frontend (port 3000)
