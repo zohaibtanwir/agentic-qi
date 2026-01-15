@@ -150,6 +150,38 @@ All three agents fully operational with real gRPC backend and LLM integration:
 | Requirement Analysis Agent | /requirement-analysis | 60.21s | 11 gaps, 4 ACs, 8284 tokens |
 | Test Cases Agent | /test-cases | 20.23s | 10 test cases with edge coverage |
 
+## Completed: History Sorting Fix (2026-01-15)
+
+### Problem (Resolved)
+History entries in Requirement Analysis Agent were not ordered chronologically (newest first).
+
+### Changes Made
+**File**: `agents/requirement-analysis-agent/src/requirement_analysis_agent/storage/weaviate_client.py`
+
+1. Added `Sort` import:
+   ```python
+   from weaviate.classes.query import MetadataQuery, Filter, Sort
+   ```
+
+2. Added sorting to `list_recent()` method (line 249):
+   ```python
+   sort=Sort.by_property("created_at", ascending=False),
+   ```
+
+3. Added sorting to `list_with_filters()` method (line 348):
+   ```python
+   sort=Sort.by_property("created_at", ascending=False),
+   ```
+
+### Verification Results
+- Container rebuilt and restarted
+- Verified at `http://localhost:3000/requirement-analysis`
+- History now displays correctly: "Coupon Code Application" (29/12/2025) appears BEFORE "Add to Wishlist Feature" (26/12/2025)
+
+### Also Completed This Session
+- Fixed Original Input display in frontend store (`requirement-analysis-store.ts`)
+- Frontend was rebuilt and deployed
+
 ## Project Structure
 - `frontend/` - Main Next.js frontend (port 3000)
 - `agents/test-data-agent/` - Python gRPC backend (port 9091 gRPC, 8091 HTTP)

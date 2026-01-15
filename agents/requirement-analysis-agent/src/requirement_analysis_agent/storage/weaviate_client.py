@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType
-from weaviate.classes.query import MetadataQuery, Filter
+from weaviate.classes.query import MetadataQuery, Filter, Sort
 
 from requirement_analysis_agent.config import Settings
 from requirement_analysis_agent.utils.logging import get_logger
@@ -246,6 +246,7 @@ class WeaviateClient:
             response = collection.query.fetch_objects(
                 limit=limit,
                 return_metadata=MetadataQuery(creation_time=True),
+                sort=Sort.by_property("created_at", ascending=False),
             )
 
             results = []
@@ -338,12 +339,13 @@ class WeaviateClient:
 
             total_count = count_response.total_count if count_response.total_count is not None else 0
 
-            # Fetch paginated results
+            # Fetch paginated results sorted by created_at descending (newest first)
             response = collection.query.fetch_objects(
                 filters=combined_filter,
                 limit=limit,
                 offset=offset,
                 return_metadata=MetadataQuery(creation_time=True),
+                sort=Sort.by_property("created_at", ascending=False),
             )
 
             results = []
