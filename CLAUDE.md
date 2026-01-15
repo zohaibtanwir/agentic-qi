@@ -106,10 +106,49 @@ All test scenarios passed:
 | Tokens Used | 8,284 |
 | Processing Time | 60.213s |
 
+### Test Cases Agent - LLM Backend Test
+- **URL**: `http://localhost:3000/test-cases`
+- **Input Type**: User Story
+- **User Story**: "As a registered user, I want to add items to my shopping cart so that I can purchase multiple products in a single transaction."
+- **Acceptance Criteria**:
+  1. User can add a product to cart from the product detail page
+  2. Cart displays item count and total price
+
+**Generation Settings**:
+- Output Format: Traditional (step-by-step)
+- Coverage Level: Standard (Comprehensive)
+- Test Types: Functional, Negative
+- Maximum Test Cases: 10
+
+**Generated Test Cases (10)**:
+| ID | Priority | Type | Title |
+|----|----------|------|-------|
+| TC_001 | High | Functional | Add a single product to the cart |
+| TC_002 | High | Functional | Add multiple products to the cart |
+| TC_003 | Medium | Functional | Verify cart display with different quantities |
+| TC_004 | Medium | Functional | Verify cart display with the same product |
+| TC_005 | Medium | Functional | Verify cart display with empty input |
+| TC_006 | Medium | Functional | Verify cart display with negative quantity |
+| TC_007 | Medium | Functional | Verify cart display with non-numeric quantity |
+| TC_008 | Medium | Functional | Verify cart display with special characters |
+| TC_009 | Medium | Functional | Verify cart display with null quantity |
+| TC_010 | High | Functional | Verify cart display with maximum quantity |
+
+**Backend Metrics**:
+| Metric | Value |
+|--------|-------|
+| Model | anthropic |
+| Tokens Used | 0 (not tracked) |
+| Processing Time | 20.23s |
+
 ### Summary
-Both agents fully operational with real gRPC backend and LLM integration:
-- Test Data Agent: Fast generation (27s), high coherence (94.4%)
-- Requirement Analysis Agent: Comprehensive analysis with Claude Sonnet 4
+All three agents fully operational with real gRPC backend and LLM integration:
+
+| Agent | URL | Time | Key Output |
+|-------|-----|------|------------|
+| Test Data Agent | /test-data | 27.01s | 10 records, 94.4% coherence |
+| Requirement Analysis Agent | /requirement-analysis | 60.21s | 11 gaps, 4 ACs, 8284 tokens |
+| Test Cases Agent | /test-cases | 20.23s | 10 test cases with edge coverage |
 
 ## Project Structure
 - `frontend/` - Main Next.js frontend (port 3000)
