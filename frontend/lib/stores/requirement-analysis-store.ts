@@ -12,6 +12,7 @@ import {
   type HistorySessionSummary,
   type HistorySession,
   type HistoryFilters,
+  type OriginalInput,
 } from '../grpc/requirementAnalysisClient';
 
 // ============= Types =============
@@ -77,6 +78,7 @@ export interface RequirementAnalysisState {
   questions: ClarifyingQuestion[];
   generatedACs: GeneratedAC[];
   extractedRequirement: ExtractedRequirement | null;
+  originalInput: OriginalInput | null;
 
   // Refinement state
   answeredQuestions: AnsweredQuestion[];
@@ -217,6 +219,7 @@ const initialState: RequirementAnalysisState = {
   questions: [],
   generatedACs: [],
   extractedRequirement: null,
+  originalInput: null,
   answeredQuestions: [],
   acceptedACs: [],
   updatedTitle: '',
@@ -428,6 +431,55 @@ export const useRequirementAnalysisStore = create<RequirementAnalysisStore>()(
           const response = await requirementAnalysisClient.analyzeRequirement(request);
 
           if (response.success) {
+            // Construct originalInput from form state for display
+            let originalInput: OriginalInput | null = null;
+            if (state.inputType === 'jira') {
+              originalInput = {
+                inputType: 'jira',
+                text: '',
+                context: '',
+                title: '',
+                jiraKey: state.jiraForm.key,
+                jiraSummary: state.jiraForm.summary,
+                jiraDescription: state.jiraForm.description,
+                jiraAcceptanceCriteria: state.jiraForm.acceptanceCriteria.filter(ac => ac.trim() !== ''),
+                transcriptText: '',
+                meetingTitle: '',
+                meetingDate: '',
+                participants: [],
+              };
+            } else if (state.inputType === 'freeform') {
+              originalInput = {
+                inputType: 'free_form',
+                text: state.freeFormForm.text,
+                context: state.freeFormForm.context,
+                title: state.freeFormForm.title,
+                jiraKey: '',
+                jiraSummary: '',
+                jiraDescription: '',
+                jiraAcceptanceCriteria: [],
+                transcriptText: '',
+                meetingTitle: '',
+                meetingDate: '',
+                participants: [],
+              };
+            } else {
+              originalInput = {
+                inputType: 'transcript',
+                text: '',
+                context: '',
+                title: '',
+                jiraKey: '',
+                jiraSummary: '',
+                jiraDescription: '',
+                jiraAcceptanceCriteria: [],
+                transcriptText: state.transcriptForm.transcript,
+                meetingTitle: state.transcriptForm.meetingTitle,
+                meetingDate: state.transcriptForm.meetingDate,
+                participants: state.transcriptForm.participants,
+              };
+            }
+
             set(
               {
                 analysisResult: response,
@@ -436,6 +488,7 @@ export const useRequirementAnalysisStore = create<RequirementAnalysisStore>()(
                 questions: response.questions || [],
                 generatedACs: response.generatedAcs || [],
                 extractedRequirement: response.extractedRequirement || null,
+                originalInput,
                 updatedTitle: response.extractedRequirement?.title || '',
                 updatedDescription: response.extractedRequirement?.description || '',
                 updatedACs: response.extractedRequirement?.originalAcs || [],
@@ -508,6 +561,9 @@ export const useRequirementAnalysisStore = create<RequirementAnalysisStore>()(
                 questions: response.questions || [],
                 generatedACs: response.generatedAcs || [],
                 extractedRequirement: response.extractedRequirement || null,
+                // Reset refinement state after successful reanalysis
+                answeredQuestions: [],
+                acceptedACs: [],
                 isReanalyzing: false,
                 activeTab: 'results',
               },
@@ -581,6 +637,7 @@ export const useRequirementAnalysisStore = create<RequirementAnalysisStore>()(
             questions: [],
             generatedACs: [],
             extractedRequirement: null,
+            originalInput: null,
             answeredQuestions: [],
             acceptedACs: [],
             updatedTitle: '',
@@ -870,6 +927,7 @@ export const useRequirementAnalysisStore = create<RequirementAnalysisStore>()(
             questions: session.questions || [],
             generatedACs: session.generatedAcs || [],
             extractedRequirement: session.extractedRequirement || null,
+            originalInput: session.originalInput || null,
             updatedTitle: session.extractedRequirement?.title || '',
             updatedDescription: session.extractedRequirement?.description || '',
             updatedACs: session.extractedRequirement?.originalAcs || [],
@@ -900,6 +958,7 @@ export const selectQuestions = (state: RequirementAnalysisStore) => state.questi
 export const selectGeneratedACs = (state: RequirementAnalysisStore) => state.generatedACs;
 export const selectIsAnalyzing = (state: RequirementAnalysisStore) => state.isAnalyzing;
 export const selectError = (state: RequirementAnalysisStore) => state.error;
+export const selectOriginalInput = (state: RequirementAnalysisStore) => state.originalInput;
 
 export const selectGapsByType = (state: RequirementAnalysisStore) => {
   const gaps = state.gaps;

@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useRequirementAnalysisStore, type RequirementAnalysisStore } from '@/lib/stores/requirement-analysis-store';
+import { type OriginalInput } from '@/lib/grpc/requirementAnalysisClient';
 
 function GradeIcon({ grade }: { grade: string }) {
   // Macy's-themed grade colors with high contrast
@@ -55,6 +57,165 @@ function ScoreLegend() {
   );
 }
 
+function OriginalInputCard({ originalInput }: { originalInput: OriginalInput }) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const getInputTypeLabel = (type: string) => {
+    switch (type) {
+      case 'jira':
+        return 'Jira Story';
+      case 'free_form':
+        return 'Free-form Input';
+      case 'transcript':
+        return 'Meeting Transcript';
+      default:
+        return 'Original Input';
+    }
+  };
+
+  const renderFreeFormInput = () => (
+    <div className="space-y-3">
+      {originalInput.title && (
+        <div>
+          <span className="text-xs font-medium text-[var(--text-muted)]">Title</span>
+          <p className="text-sm text-[var(--text-primary)] mt-1">{originalInput.title}</p>
+        </div>
+      )}
+      <div>
+        <span className="text-xs font-medium text-[var(--text-muted)]">Requirement Text</span>
+        <p className="text-sm text-[var(--text-primary)] mt-1 whitespace-pre-wrap">{originalInput.text}</p>
+      </div>
+      {originalInput.context && (
+        <div>
+          <span className="text-xs font-medium text-[var(--text-muted)]">Context</span>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">{originalInput.context}</p>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderJiraInput = () => (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        {originalInput.jiraKey && (
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-mono">
+            {originalInput.jiraKey}
+          </span>
+        )}
+        {originalInput.jiraSummary && (
+          <span className="text-sm font-medium text-[var(--text-primary)]">{originalInput.jiraSummary}</span>
+        )}
+      </div>
+      {originalInput.jiraDescription && (
+        <div>
+          <span className="text-xs font-medium text-[var(--text-muted)]">Description</span>
+          <p className="text-sm text-[var(--text-primary)] mt-1 whitespace-pre-wrap">{originalInput.jiraDescription}</p>
+        </div>
+      )}
+      {originalInput.jiraAcceptanceCriteria && originalInput.jiraAcceptanceCriteria.length > 0 && (
+        <div>
+          <span className="text-xs font-medium text-[var(--text-muted)]">Acceptance Criteria</span>
+          <ul className="mt-1 space-y-1">
+            {originalInput.jiraAcceptanceCriteria.map((ac, i) => (
+              <li key={i} className="text-sm text-[var(--text-primary)] flex items-start gap-2">
+                <span className="text-[var(--text-muted)]">{i + 1}.</span>
+                {ac}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderTranscriptInput = () => (
+    <div className="space-y-3">
+      <div className="flex items-center gap-4 text-sm">
+        {originalInput.meetingTitle && (
+          <div>
+            <span className="text-[var(--text-muted)]">Meeting:</span>
+            <span className="ml-1 text-[var(--text-primary)]">{originalInput.meetingTitle}</span>
+          </div>
+        )}
+        {originalInput.meetingDate && (
+          <div>
+            <span className="text-[var(--text-muted)]">Date:</span>
+            <span className="ml-1 text-[var(--text-primary)]">{originalInput.meetingDate}</span>
+          </div>
+        )}
+      </div>
+      {originalInput.participants && originalInput.participants.length > 0 && (
+        <div>
+          <span className="text-xs font-medium text-[var(--text-muted)]">Participants</span>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {originalInput.participants.map((p, i) => (
+              <span key={i} className="px-2 py-0.5 bg-gray-100 rounded text-xs text-[var(--text-secondary)]">
+                {p}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {originalInput.transcriptText && (
+        <div>
+          <span className="text-xs font-medium text-[var(--text-muted)]">Transcript</span>
+          <p className="text-sm text-[var(--text-primary)] mt-1 whitespace-pre-wrap max-h-64 overflow-y-auto bg-gray-50 p-3 rounded">
+            {originalInput.transcriptText}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderContent = () => {
+    switch (originalInput.inputType) {
+      case 'jira':
+        return renderJiraInput();
+      case 'transcript':
+        return renderTranscriptInput();
+      case 'free_form':
+      default:
+        return renderFreeFormInput();
+    }
+  };
+
+  return (
+    <div className="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-default)]">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between p-4 hover:bg-[var(--surface-secondary)] transition-colors rounded-t-xl"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-purple-100 rounded-lg">
+            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div className="text-left">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Original Requirement</h3>
+            <p className="text-xs text-[var(--text-muted)]">{getInputTypeLabel(originalInput.inputType)}</p>
+          </div>
+        </div>
+        <svg
+          className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isExpanded && (
+        <div className="px-4 pb-4 pt-0 border-t border-[var(--border-default)]">
+          <div className="pt-4">
+            {renderContent()}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AnalysisResults() {
   const analysisResult = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.analysisResult);
   const qualityScore = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.qualityScore);
@@ -62,6 +223,7 @@ export function AnalysisResults() {
   const questions = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.questions);
   const generatedACs = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.generatedACs);
   const extractedRequirement = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.extractedRequirement);
+  const originalInput = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.originalInput);
   const clearAnalysis = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.clearAnalysis);
   const answerQuestion = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.answerQuestion);
   const answeredQuestions = useRequirementAnalysisStore((state: RequirementAnalysisStore) => state.answeredQuestions);
@@ -114,6 +276,9 @@ export function AnalysisResults() {
           </button>
         </div>
       </div>
+
+      {/* Original Input (shown when viewing from history) */}
+      {originalInput && <OriginalInputCard originalInput={originalInput} />}
 
       {/* Quality Score Card */}
       {qualityScore && (

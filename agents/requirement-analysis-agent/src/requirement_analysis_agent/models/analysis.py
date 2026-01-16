@@ -195,6 +195,31 @@ class AnalysisMetadata(BaseModel):
     agent_version: str = Field(description="Agent version")
 
 
+class OriginalInput(BaseModel):
+    """Original input data stored for history reference."""
+
+    input_type: InputType = Field(description="Type of input: jira, free_form, transcript")
+
+    # Free form fields
+    text: Optional[str] = Field(default=None, description="Free form requirement text")
+    context: Optional[str] = Field(default=None, description="Free form context")
+    title: Optional[str] = Field(default=None, description="Free form title")
+
+    # Jira fields
+    jira_key: Optional[str] = Field(default=None, description="Jira story key")
+    jira_summary: Optional[str] = Field(default=None, description="Jira summary")
+    jira_description: Optional[str] = Field(default=None, description="Jira description")
+    jira_acceptance_criteria: list[str] = Field(
+        default_factory=list, description="Jira acceptance criteria"
+    )
+
+    # Transcript fields
+    transcript_text: Optional[str] = Field(default=None, description="Transcript text")
+    meeting_title: Optional[str] = Field(default=None, description="Meeting title")
+    meeting_date: Optional[str] = Field(default=None, description="Meeting date")
+    participants: list[str] = Field(default_factory=list, description="Meeting participants")
+
+
 class AnalysisResult(BaseModel):
     """Complete result of requirement analysis."""
 
@@ -218,3 +243,6 @@ class AnalysisResult(BaseModel):
     blockers: list[str] = Field(default_factory=list, description="Blocking issues")
     metadata: AnalysisMetadata = Field(description="Analysis metadata")
     error: Optional[str] = Field(default=None, description="Error message if failed")
+    original_input: Optional[OriginalInput] = Field(
+        default=None, description="Original input data for history"
+    )

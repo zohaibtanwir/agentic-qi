@@ -416,6 +416,28 @@ message GetHistorySessionResponse {
   string error = 3;
 }
 
+// Original input stored in history for reference
+message OriginalInput {
+  string input_type = 1;                         // "jira", "free_form", "transcript"
+
+  // For free_form input
+  string text = 2;
+  string context = 3;
+  string title = 4;
+
+  // For jira input
+  string jira_key = 5;
+  string jira_summary = 6;
+  string jira_description = 7;
+  repeated string jira_acceptance_criteria = 8;
+
+  // For transcript input
+  string transcript_text = 9;
+  string meeting_title = 10;
+  string meeting_date = 11;
+  repeated string participants = 12;
+}
+
 message HistorySession {
   string session_id = 1;
 
@@ -438,6 +460,9 @@ message HistorySession {
   float analysis_time_ms = 14;
   string created_at = 15;
   string updated_at = 16;
+
+  // Original input data for history display
+  OriginalInput original_input = 17;
 }
 
 message DeleteHistorySessionRequest {

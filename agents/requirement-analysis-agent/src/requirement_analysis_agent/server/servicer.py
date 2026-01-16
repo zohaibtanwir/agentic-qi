@@ -22,6 +22,7 @@ from requirement_analysis_agent.models import (
     FreeFormInput,
     InputType,
     JiraStoryInput,
+    OriginalInput,
     TranscriptInput,
 )
 from requirement_analysis_agent.parsers import (
@@ -140,8 +141,9 @@ class RequirementAnalysisServicer(pb2_grpc.RequirementAnalysisServiceServicer):
             # Run analysis
             result = await self.analysis_engine.analyze(parsed_input, config)
 
-            # Save to history
+            # Save to history with original input
             if self.history_repo and result.success:
+                result.original_input = self._extract_original_input(request)
                 await self.history_repo.save(result)
 
             return self._result_to_response(result)
@@ -556,6 +558,7 @@ class RequirementAnalysisServicer(pb2_grpc.RequirementAnalysisServiceServicer):
                 analysis_time_ms=result.metadata.analysis_time_ms,
                 created_at=session_data["created_at"],
                 updated_at=session_data["updated_at"],
+                original_input=self._build_original_input_proto(result.original_input),
             )
 
             logger.info("GetHistorySession completed", session_id=session_id)
@@ -781,6 +784,25 @@ class RequirementAnalysisServicer(pb2_grpc.RequirementAnalysisServiceServicer):
             ],
         )
 
+    def _build_original_input_proto(self, oi: Optional[OriginalInput]) -> Optional[pb2.OriginalInput]:
+        """Build OriginalInput proto from model."""
+        if not oi:
+            return None
+        return pb2.OriginalInput(
+            input_type=oi.input_type.value,
+            text=oi.text or "",
+            context=oi.context or "",
+            title=oi.title or "",
+            jira_key=oi.jira_key or "",
+            jira_summary=oi.jira_summary or "",
+            jira_description=oi.jira_description or "",
+            jira_acceptance_criteria=oi.jira_acceptance_criteria,
+            transcript_text=oi.transcript_text or "",
+            meeting_title=oi.meeting_title or "",
+            meeting_date=oi.meeting_date or "",
+            participants=oi.participants,
+        )
+
     # =========================================================================
     # Input Parsing and Config Building
     # =========================================================================
@@ -836,6 +858,35 @@ class RequirementAnalysisServicer(pb2_grpc.RequirementAnalysisServiceServicer):
             llm_provider=config.llm_provider or "anthropic",
             domain=config.domain or "ecommerce",
         )
+
+    def _extract_original_input(self, request: pb2.AnalyzeRequest) -> Optional[OriginalInput]:
+        """Extract original input from gRPC request for history storage."""
+        input_type = request.WhichOneof("input")
+
+        if input_type == "free_form":
+            return OriginalInput(
+                input_type=InputType.FREE_FORM,
+                text=request.free_form.text,
+                context=request.free_form.context or None,
+                title=request.free_form.title or None,
+            )
+        elif input_type == "jira_story":
+            return OriginalInput(
+                input_type=InputType.JIRA,
+                jira_key=request.jira_story.key,
+                jira_summary=request.jira_story.summary,
+                jira_description=request.jira_story.description,
+                jira_acceptance_criteria=list(request.jira_story.acceptance_criteria),
+            )
+        elif input_type == "transcript":
+            return OriginalInput(
+                input_type=InputType.TRANSCRIPT,
+                transcript_text=request.transcript.transcript,
+                meeting_title=request.transcript.meeting_title or None,
+                meeting_date=request.transcript.meeting_date or None,
+                participants=list(request.transcript.participants),
+            )
+        return None
 
     def _result_to_response(self, result: AnalysisResult) -> pb2.AnalyzeResponse:
         """Convert AnalysisResult to proto response."""

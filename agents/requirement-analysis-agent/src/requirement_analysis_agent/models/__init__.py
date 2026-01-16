@@ -19,6 +19,7 @@ from .analysis import (
     DomainWarning,
     DomainValidation,
     AnalysisMetadata,
+    OriginalInput,
     AnalysisResult,
 )
 from .inputs import (
@@ -56,6 +57,7 @@ __all__ = [
     "DomainWarning",
     "DomainValidation",
     "AnalysisMetadata",
+    "OriginalInput",
     "AnalysisResult",
     # Input Models
     "JiraStoryInput",

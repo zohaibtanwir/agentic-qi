@@ -39,6 +39,7 @@ import {
   type HistorySessionSummary,
   type HistorySession,
   type HistoryFilters,
+  type OriginalInput,
 } from './generated/requirement_analysis';
 
 const GRPC_WEB_URL = process.env.NEXT_PUBLIC_GRPC_WEB_URL || 'http://localhost:8085';
@@ -339,6 +340,20 @@ function generateMockGetHistorySessionResponse(request: GetHistorySessionRequest
       analysisTimeMs: 2100,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      originalInput: {
+        inputType: 'free_form',
+        text: 'Mock requirement text',
+        context: '',
+        title: 'Mock Session',
+        jiraKey: '',
+        jiraSummary: '',
+        jiraDescription: '',
+        jiraAcceptanceCriteria: [],
+        transcriptText: '',
+        meetingTitle: '',
+        meetingDate: '',
+        participants: [],
+      },
     },
     error: '',
   };
@@ -602,6 +617,7 @@ export type {
   HistorySessionSummary,
   HistorySession,
   HistoryFilters,
+  OriginalInput,
 };
 
 export default requirementAnalysisClient;

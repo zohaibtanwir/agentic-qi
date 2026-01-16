@@ -419,6 +419,26 @@ export interface GetHistorySessionResponse {
   error: string;
 }
 
+/** Original input stored in history for reference */
+export interface OriginalInput {
+  /** "jira", "free_form", "transcript" */
+  inputType: string;
+  /** For free_form input */
+  text: string;
+  context: string;
+  title: string;
+  /** For jira input */
+  jiraKey: string;
+  jiraSummary: string;
+  jiraDescription: string;
+  jiraAcceptanceCriteria: string[];
+  /** For transcript input */
+  transcriptText: string;
+  meetingTitle: string;
+  meetingDate: string;
+  participants: string[];
+}
+
 export interface HistorySession {
   sessionId: string;
   /** Full analysis data */
@@ -438,6 +458,8 @@ export interface HistorySession {
   analysisTimeMs: number;
   createdAt: string;
   updatedAt: string;
+  /** Original input data for history display */
+  originalInput: OriginalInput | undefined;
 }
 
 export interface DeleteHistorySessionRequest {
@@ -5256,6 +5278,259 @@ export const GetHistorySessionResponse: MessageFns<GetHistorySessionResponse> = 
   },
 };
 
+function createBaseOriginalInput(): OriginalInput {
+  return {
+    inputType: "",
+    text: "",
+    context: "",
+    title: "",
+    jiraKey: "",
+    jiraSummary: "",
+    jiraDescription: "",
+    jiraAcceptanceCriteria: [],
+    transcriptText: "",
+    meetingTitle: "",
+    meetingDate: "",
+    participants: [],
+  };
+}
+
+export const OriginalInput: MessageFns<OriginalInput> = {
+  encode(message: OriginalInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.inputType !== "") {
+      writer.uint32(10).string(message.inputType);
+    }
+    if (message.text !== "") {
+      writer.uint32(18).string(message.text);
+    }
+    if (message.context !== "") {
+      writer.uint32(26).string(message.context);
+    }
+    if (message.title !== "") {
+      writer.uint32(34).string(message.title);
+    }
+    if (message.jiraKey !== "") {
+      writer.uint32(42).string(message.jiraKey);
+    }
+    if (message.jiraSummary !== "") {
+      writer.uint32(50).string(message.jiraSummary);
+    }
+    if (message.jiraDescription !== "") {
+      writer.uint32(58).string(message.jiraDescription);
+    }
+    for (const v of message.jiraAcceptanceCriteria) {
+      writer.uint32(66).string(v!);
+    }
+    if (message.transcriptText !== "") {
+      writer.uint32(74).string(message.transcriptText);
+    }
+    if (message.meetingTitle !== "") {
+      writer.uint32(82).string(message.meetingTitle);
+    }
+    if (message.meetingDate !== "") {
+      writer.uint32(90).string(message.meetingDate);
+    }
+    for (const v of message.participants) {
+      writer.uint32(98).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): OriginalInput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseOriginalInput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.inputType = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.text = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.context = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.title = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.jiraKey = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.jiraSummary = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.jiraDescription = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.jiraAcceptanceCriteria.push(reader.string());
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.transcriptText = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.meetingTitle = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.meetingDate = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.participants.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): OriginalInput {
+    return {
+      inputType: isSet(object.inputType) ? globalThis.String(object.inputType) : "",
+      text: isSet(object.text) ? globalThis.String(object.text) : "",
+      context: isSet(object.context) ? globalThis.String(object.context) : "",
+      title: isSet(object.title) ? globalThis.String(object.title) : "",
+      jiraKey: isSet(object.jiraKey) ? globalThis.String(object.jiraKey) : "",
+      jiraSummary: isSet(object.jiraSummary) ? globalThis.String(object.jiraSummary) : "",
+      jiraDescription: isSet(object.jiraDescription) ? globalThis.String(object.jiraDescription) : "",
+      jiraAcceptanceCriteria: globalThis.Array.isArray(object?.jiraAcceptanceCriteria)
+        ? object.jiraAcceptanceCriteria.map((e: any) => globalThis.String(e))
+        : [],
+      transcriptText: isSet(object.transcriptText) ? globalThis.String(object.transcriptText) : "",
+      meetingTitle: isSet(object.meetingTitle) ? globalThis.String(object.meetingTitle) : "",
+      meetingDate: isSet(object.meetingDate) ? globalThis.String(object.meetingDate) : "",
+      participants: globalThis.Array.isArray(object?.participants)
+        ? object.participants.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: OriginalInput): unknown {
+    const obj: any = {};
+    if (message.inputType !== "") {
+      obj.inputType = message.inputType;
+    }
+    if (message.text !== "") {
+      obj.text = message.text;
+    }
+    if (message.context !== "") {
+      obj.context = message.context;
+    }
+    if (message.title !== "") {
+      obj.title = message.title;
+    }
+    if (message.jiraKey !== "") {
+      obj.jiraKey = message.jiraKey;
+    }
+    if (message.jiraSummary !== "") {
+      obj.jiraSummary = message.jiraSummary;
+    }
+    if (message.jiraDescription !== "") {
+      obj.jiraDescription = message.jiraDescription;
+    }
+    if (message.jiraAcceptanceCriteria?.length) {
+      obj.jiraAcceptanceCriteria = message.jiraAcceptanceCriteria;
+    }
+    if (message.transcriptText !== "") {
+      obj.transcriptText = message.transcriptText;
+    }
+    if (message.meetingTitle !== "") {
+      obj.meetingTitle = message.meetingTitle;
+    }
+    if (message.meetingDate !== "") {
+      obj.meetingDate = message.meetingDate;
+    }
+    if (message.participants?.length) {
+      obj.participants = message.participants;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<OriginalInput>): OriginalInput {
+    return OriginalInput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<OriginalInput>): OriginalInput {
+    const message = createBaseOriginalInput();
+    message.inputType = object.inputType ?? "";
+    message.text = object.text ?? "";
+    message.context = object.context ?? "";
+    message.title = object.title ?? "";
+    message.jiraKey = object.jiraKey ?? "";
+    message.jiraSummary = object.jiraSummary ?? "";
+    message.jiraDescription = object.jiraDescription ?? "";
+    message.jiraAcceptanceCriteria = object.jiraAcceptanceCriteria?.map((e) => e) || [];
+    message.transcriptText = object.transcriptText ?? "";
+    message.meetingTitle = object.meetingTitle ?? "";
+    message.meetingDate = object.meetingDate ?? "";
+    message.participants = object.participants?.map((e) => e) || [];
+    return message;
+  },
+};
+
 function createBaseHistorySession(): HistorySession {
   return {
     sessionId: "",
@@ -5274,6 +5549,7 @@ function createBaseHistorySession(): HistorySession {
     analysisTimeMs: 0,
     createdAt: "",
     updatedAt: "",
+    originalInput: undefined,
   };
 }
 
@@ -5326,6 +5602,9 @@ export const HistorySession: MessageFns<HistorySession> = {
     }
     if (message.updatedAt !== "") {
       writer.uint32(130).string(message.updatedAt);
+    }
+    if (message.originalInput !== undefined) {
+      OriginalInput.encode(message.originalInput, writer.uint32(138).fork()).join();
     }
     return writer;
   },
@@ -5465,6 +5744,14 @@ export const HistorySession: MessageFns<HistorySession> = {
           message.updatedAt = reader.string();
           continue;
         }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.originalInput = OriginalInput.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5500,6 +5787,7 @@ export const HistorySession: MessageFns<HistorySession> = {
       analysisTimeMs: isSet(object.analysisTimeMs) ? globalThis.Number(object.analysisTimeMs) : 0,
       createdAt: isSet(object.createdAt) ? globalThis.String(object.createdAt) : "",
       updatedAt: isSet(object.updatedAt) ? globalThis.String(object.updatedAt) : "",
+      originalInput: isSet(object.originalInput) ? OriginalInput.fromJSON(object.originalInput) : undefined,
     };
   },
 
@@ -5553,6 +5841,9 @@ export const HistorySession: MessageFns<HistorySession> = {
     if (message.updatedAt !== "") {
       obj.updatedAt = message.updatedAt;
     }
+    if (message.originalInput !== undefined) {
+      obj.originalInput = OriginalInput.toJSON(message.originalInput);
+    }
     return obj;
   },
 
@@ -5583,6 +5874,9 @@ export const HistorySession: MessageFns<HistorySession> = {
     message.analysisTimeMs = object.analysisTimeMs ?? 0;
     message.createdAt = object.createdAt ?? "";
     message.updatedAt = object.updatedAt ?? "";
+    message.originalInput = (object.originalInput !== undefined && object.originalInput !== null)
+      ? OriginalInput.fromPartial(object.originalInput)
+      : undefined;
     return message;
   },
 };
