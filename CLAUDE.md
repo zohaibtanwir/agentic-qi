@@ -8,6 +8,18 @@
 - `bd add "title" --priority P1 --type feature` - Create issue
 - `bd close <id>` - Close issue
 
+### Beads Viewer (bv) - Graph-Aware Triage
+
+`bv` is a graph-aware triage engine for Beads projects. Instead of parsing JSONL or hallucinating graph traversal, use robot flags for deterministic, dependency-aware outputs with precomputed metrics (PageRank, betweenness, critical path, cycles, HITS, eigenvector, k-core).
+
+**Robot commands (for AI agents):**
+- `bv --robot-triage` - Unified mega-command: triage, recommendations, quick wins, blockers, health
+- `bv --robot-next` - Single top recommendation with claim command
+- `bv --robot-plan` - Actionable work tracks and dependencies
+- `bv --robot-insights` - Full graph metrics and top N lists
+
+**IMPORTANT:** Never run bare `bv` in agent context—it launches interactive TUI. Always use `--robot-*` flags.
+
 ## Completed: Original Input Display (2026-01-16)
 
 ### Feature
