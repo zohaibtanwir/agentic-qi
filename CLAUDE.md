@@ -20,6 +20,23 @@
 
 **IMPORTANT:** Never run bare `bv` in agent context—it launches interactive TUI. Always use `--robot-*` flags.
 
+### CASS - Coding Agent Session Search
+
+CASS indexes all coding agent conversations (Claude Code, Cursor, Aider, etc.) into a searchable knowledge base. Use it to find past solutions before writing new code.
+
+**Search commands (for AI agents):**
+- `cass search "error message" --robot --limit 5` - Find past solutions to similar problems
+- `cass search "feature name" --robot --workspace $(pwd)` - Search within this project's history
+- `cass search "bug fix" --robot --days 30` - Recent solutions only
+- `cass expand /path/session.jsonl -n 42 -C 5 --json` - Expand context around a result
+
+**When to use CASS:**
+- Before solving a bug: search if it was encountered before
+- Before implementing a feature: find similar past implementations
+- When debugging: search for the error message or symptom
+
+**IMPORTANT:** Never run bare `cass` in agent context—it launches interactive TUI. Always use `--robot` or `--json` flags.
+
 ## Completed: Original Input Display (2026-01-16)
 
 ### Feature
